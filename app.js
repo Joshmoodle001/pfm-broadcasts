@@ -2,7 +2,7 @@
 
 /* PFM Broadcasts — Supabase */
 
-const SUPABASE_URL = 'https://bmzbtwhxhhijueudznuk.supabase.co';
+const SUPABASE_URL = 'https://bmzzbtwhxhijueudznuk.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtenpidHdoeGhpanVldWR6bnVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDQzMzIsImV4cCI6MjA5NzM4MDMzMn0.K8r4XYMrSnCXQ4j_FJw7J4cbzuQ9O1RToDsmCUyLQSM';
 
 let live = false;
