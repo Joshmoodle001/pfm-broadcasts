@@ -76,9 +76,8 @@ const els = {
   installSteps:         document.querySelector('#installSteps'),
   backendStatus:        document.querySelector('#backendStatus'),
   toast:                document.querySelector('#toast'),
-  connectBar:           document.querySelector('#connectBar'),
-  connectForm:          document.querySelector('#connectForm'),
-  connectInput:         document.querySelector('#connectInput'),
+  statusDot:            document.querySelector('#statusDot'),
+  statusLabel:          document.querySelector('#statusLabel'),
 };
 
 // ── helpers ───────────────────────────────────────────────
@@ -152,12 +151,11 @@ async function pbFetch(path, opts = {}) {
 // ── PocketBase live backend (raw fetch, zero SDK deps) ─────
 
 async function probePocketBase() {
-  if (!PB_URL) { els.connectBar?.classList.remove('hidden'); return false; }
+  if (!PB_URL) { setStatus(false); return false; }
   pbUrl = PB_URL.replace(/\/+$/, '');
   try {
     const r = await fetch(pbUrl + '/api/health').then(r => r.json());
     if (r.code !== 200) throw new Error('unhealthy');
-    els.connectBar?.classList.add('hidden');
     // restore admin session if stored
     const tok = sessionStorage.getItem('pfm_admin_token');
     const usr = sessionStorage.getItem('pfm_admin_user');
@@ -167,12 +165,18 @@ async function probePocketBase() {
         await pbFetch('/api/collections/users/records?perPage=1');
       } catch { adminToken = null; adminUser = null; sessionStorage.removeItem('pfm_admin_token'); sessionStorage.removeItem('pfm_admin_user'); }
     }
+    setStatus(true);
     return true;
   } catch (e) {
     console.warn('Backend probe failed:', e.message);
-    els.connectBar?.classList.remove('hidden');
+    setStatus(false);
     return false;
   }
+}
+
+function setStatus(online) {
+  if (els.statusDot) els.statusDot.style.background = online ? '#15803d' : '#d71920';
+  if (els.statusLabel) els.statusLabel.textContent = online ? 'Connected' : 'Admin';
 }
 
 async function refreshFromLive() {
@@ -443,23 +447,6 @@ function bindEvents() {
     }
     if (email.toLowerCase() === DEMO_ADMIN_EMAIL && password === DEMO_ADMIN_PASSWORD) { sessionStorage.setItem('pfm_demo_admin','1'); renderAdminState(); showToast('Admin unlocked (demo)'); return; }
     showToast('Incorrect demo login');
-  });
-
-  // connect to server
-  els.connectForm?.addEventListener('submit', async e => {
-    e.preventDefault();
-    const url = els.connectInput.value.trim();
-    if (!url) return showToast('Paste your PocketBase server URL');
-    PB_URL = url;
-    localStorage.setItem('pfm_pb_url', url);
-    liveMode = await probePocketBase();
-    if (liveMode) {
-      showToast('Connected! Loading posts...');
-      await refreshFromLive();
-      startPolling();
-    } else {
-      showToast('Could not reach that server. Check the URL and try again.');
-    }
   });
 
   // forgot password

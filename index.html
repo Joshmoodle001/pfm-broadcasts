@@ -702,19 +702,13 @@
         <img src="assets/pfm-mark-wide.png" alt="PFM logo" />
         <span>Professional Field<br>Marketing</span>
       </button>
-      <button class="btn-ghost" type="button" data-screen="admin" aria-label="Open admin access">🔒 Admin</button>
+      <button class="btn-ghost" type="button" data-screen="admin" aria-label="Open admin access">
+        <span id="statusDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d71920;margin-right:6px;vertical-align:middle"></span>
+        <span id="statusLabel">Admin</span>
+      </button>
     </header>
 
     <main>
-      <div id="connectBar" class="status-banner hidden" style="margin:0 0 12px;text-align:center">
-        <strong>Not connected to server</strong>
-        <span>Paste your PocketBase URL below to see broadcasts.</span>
-        <form id="connectForm" style="display:flex;gap:8px;margin-top:8px;max-width:500px;margin-left:auto;margin-right:auto">
-          <input id="connectInput" type="url" placeholder="https://your-tunnel.trycloudflare.com" style="flex:1;min-width:0" />
-          <button type="submit" style="white-space:nowrap">Connect</button>
-        </form>
-      </div>
-
       <section class="screen active" id="screen-welcome" aria-labelledby="welcomeTitle">
         <div class="welcome-layout">
           <article class="hero">
