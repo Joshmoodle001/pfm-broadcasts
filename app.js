@@ -71,9 +71,12 @@ const els = {
   clearBtn:              document.querySelector('#clearBtn'),
   installBtn:            document.querySelector('#installBtn'),
   installFromWelcomeBtn: document.querySelector('#installFromWelcomeBtn'),
-  installSteps:          document.querySelector('#installSteps'),
-  backendStatus:         document.querySelector('#backendStatus'),
-  toast:                 document.querySelector('#toast'),
+  installSteps:         document.querySelector('#installSteps'),
+  backendStatus:        document.querySelector('#backendStatus'),
+  toast:                document.querySelector('#toast'),
+  connectBar:           document.querySelector('#connectBar'),
+  connectForm:          document.querySelector('#connectForm'),
+  connectInput:         document.querySelector('#connectInput'),
 };
 
 // ── helpers ───────────────────────────────────────────────
@@ -145,13 +148,14 @@ async function probePocketBase() {
   try {
     pb = new PocketBase(PB_URL);
     await pb.health.check();
-    // restore session if present
+    els.connectBar?.classList.add('hidden');
     if (pb.authStore.isValid) {
       try { await pb.collection('users').authRefresh(); } catch { pb.authStore.clear(); }
     }
     return true;
   } catch {
     pb = null;
+    els.connectBar?.classList.remove('hidden');
     return false;
   }
 }
@@ -427,6 +431,24 @@ function bindEvents() {
     }
     if (email.toLowerCase() === DEMO_ADMIN_EMAIL && password === DEMO_ADMIN_PASSWORD) { sessionStorage.setItem('pfm_demo_admin','1'); renderAdminState(); showToast('Admin unlocked (demo)'); return; }
     showToast('Incorrect demo login');
+  });
+
+  // connect to server
+  els.connectForm?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const url = els.connectInput.value.trim();
+    if (!url) return showToast('Paste your PocketBase server URL');
+    PB_URL = url;
+    localStorage.setItem('pfm_pb_url', url);
+    liveMode = await probePocketBase();
+    if (liveMode) {
+      showToast('Connected! Loading posts...');
+      await refreshFromLive();
+      subscribeRealtime();
+      startPolling();
+    } else {
+      showToast('Could not reach that server. Check the URL and try again.');
+    }
   });
 
   // forgot password
