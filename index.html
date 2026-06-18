@@ -830,6 +830,24 @@
               </label>
               <button type="submit">Unlock Admin</button>
               <button class="btn-link" type="button" id="showResetBtn">Forgot password?</button>
+              <button class="btn-link" type="button" id="showSignupBtn">Create account</button>
+            </form>
+
+            <form class="form-grid hidden" id="signupForm">
+              <div>
+                <h2>Create Admin Account</h2>
+                <p>First account is auto-approved as admin.</p>
+              </div>
+              <label>
+                Email address
+                <input id="signupEmail" name="signupEmail" type="email" autocomplete="email" placeholder="admin@pfm.co.za" required />
+              </label>
+              <label>
+                Password
+                <input id="signupPassword" name="signupPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Minimum 8 characters" required />
+              </label>
+              <button type="submit">Create Account</button>
+              <button class="btn-link" type="button" id="backToLoginFromSignup">Back to login</button>
             </form>
 
             <form class="form-grid hidden" id="resetPasswordForm">

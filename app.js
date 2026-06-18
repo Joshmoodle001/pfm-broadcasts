@@ -48,6 +48,11 @@ const els = {
   newPassword:           document.querySelector('#newPassword'),
   showResetBtn:          document.querySelector('#showResetBtn'),
   backToLoginBtn:        document.querySelector('#backToLoginBtn'),
+  showSignupBtn:         document.querySelector('#showSignupBtn'),
+  signupForm:            document.querySelector('#signupForm'),
+  signupEmail:           document.querySelector('#signupEmail'),
+  signupPassword:        document.querySelector('#signupPassword'),
+  backToLoginFromSignup: document.querySelector('#backToLoginFromSignup'),
   lockAdminBtn:          document.querySelector('#lockAdminBtn'),
   broadcastForm:         document.querySelector('#broadcastForm'),
   title:                document.querySelector('#title'),
@@ -411,8 +416,12 @@ function renderBackendStatus() {
 }
 
 function showLoginForm(focus) {
-  els.adminLoginForm?.classList.remove('hidden'); els.resetPasswordForm?.classList.add('hidden'); els.newPasswordForm?.classList.add('hidden');
+  els.adminLoginForm?.classList.remove('hidden'); els.resetPasswordForm?.classList.add('hidden'); els.newPasswordForm?.classList.add('hidden'); els.signupForm?.classList.add('hidden');
   if (focus !== false) setTimeout(() => els.adminEmail?.focus(), 80);
+}
+function showSignupForm() {
+  els.adminLoginForm?.classList.add('hidden'); els.resetPasswordForm?.classList.add('hidden'); els.newPasswordForm?.classList.add('hidden'); els.signupForm?.classList.remove('hidden');
+  setTimeout(() => els.signupEmail?.focus(), 80);
 }
 function showResetForm() {
   els.adminLoginForm?.classList.add('hidden'); els.resetPasswordForm?.classList.remove('hidden'); els.newPasswordForm?.classList.add('hidden');
@@ -509,6 +518,24 @@ function bindEvents() {
 
   els.showResetBtn?.addEventListener('click', showResetForm);
   els.backToLoginBtn?.addEventListener('click', () => showLoginForm());
+  els.showSignupBtn?.addEventListener('click', showSignupForm);
+  els.backToLoginFromSignup?.addEventListener('click', () => showLoginForm());
+
+  // signup
+  els.signupForm?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = els.signupEmail.value.trim(), password = els.signupPassword.value;
+    if (password.length < 8) { showToast('Password must be at least 8 characters'); return; }
+    if (liveMode === 'supabase') {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) { showToast(error.message); return; }
+      if (data.user?.identities?.length === 0) { showToast('This email is already registered.'); return; }
+      showToast('Account created! First signup is auto-approved as admin. Check your email and log in.');
+    } else {
+      showToast('Connect Supabase backend to create accounts.');
+    }
+    showLoginForm(false);
+  });
   els.lockAdminBtn?.addEventListener('click', doLogout);
   els.seedBtn?.addEventListener('click', seedDemoPosts);
   els.clearBtn?.addEventListener('click', clearDemoPosts);
