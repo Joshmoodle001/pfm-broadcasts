@@ -53,6 +53,9 @@ const els = {
   signupEmail:           document.querySelector('#signupEmail'),
   signupPassword:        document.querySelector('#signupPassword'),
   backToLoginFromSignup: document.querySelector('#backToLoginFromSignup'),
+  addAdminForm:          document.querySelector('#addAdminForm'),
+  newAdminEmail:         document.querySelector('#newAdminEmail'),
+  newAdminPassword:      document.querySelector('#newAdminPassword'),
   lockAdminBtn:          document.querySelector('#lockAdminBtn'),
   broadcastForm:         document.querySelector('#broadcastForm'),
   title:                document.querySelector('#title'),
@@ -164,6 +167,9 @@ async function initSupabase() {
     if (data?.session?.user) {
       const prof = await supabase.from('admin_profiles').select('is_admin').eq('user_id', data.session.user.id).eq('is_admin', true).maybeSingle();
       sessionStorage.setItem('pfm_supabase_admin', prof.data ? '1' : '');
+      // Check if setup is complete (any admins exist)
+      const { count } = await supabase.from('admin_profiles').select('*', { count:'exact', head:true }).eq('is_admin', true);
+      els.showSignupBtn?.classList.toggle('hidden', (count || 0) > 0);
     }
 
     return true;
@@ -520,6 +526,20 @@ function bindEvents() {
   els.backToLoginBtn?.addEventListener('click', () => showLoginForm());
   els.showSignupBtn?.addEventListener('click', showSignupForm);
   els.backToLoginFromSignup?.addEventListener('click', () => showLoginForm());
+
+  // add admin (super admin only)
+  els.addAdminForm?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (liveMode !== 'supabase') { showToast('Only available on Supabase'); return; }
+    const email = els.newAdminEmail.value.trim(), password = els.newAdminPassword.value;
+    if (password.length < 8) { showToast('Password must be at least 8 characters'); return; }
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) { showToast(error.message); return; }
+    if (!data.user) { showToast('Could not create user'); return; }
+    await supabase.from('admin_profiles').insert({ user_id: data.user.id, full_name: email, is_admin: true });
+    showToast('Admin added: ' + email);
+    els.addAdminForm.reset();
+  });
 
   // signup
   els.signupForm?.addEventListener('submit', async e => {

@@ -903,6 +903,12 @@
             <aside class="admin-card">
               <h2>Admin Tools</h2>
               <div class="status-banner" id="backendStatus"></div>
+              <form class="form-grid" id="addAdminForm" style="border:1px solid var(--line);border-radius:16px;padding:14px">
+                <strong style="color:var(--pfm-blue)">Add Admin</strong>
+                <input id="newAdminEmail" type="email" placeholder="new-admin@pfm.co.za" required />
+                <input id="newAdminPassword" type="password" placeholder="Password (min 8 chars)" minlength="8" required />
+                <button type="submit">Add Admin</button>
+              </form>
               <div class="form-actions">
                 <button class="btn-secondary" type="button" id="seedBtn">Add demo posts</button>
                 <button class="btn-secondary" type="button" id="clearBtn">Clear demo posts</button>
