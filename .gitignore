@@ -1,9 +1,15 @@
 node_modules/
 *.db
 pb_data/
+pb_migrations/
 .DS_Store
 *.log
 pocketbase.exe
 cloudflared.exe
+_*.js
+setup.js
+CHANGELOG.md
+LICENSE.md
+README.txt
 
 .vercel
