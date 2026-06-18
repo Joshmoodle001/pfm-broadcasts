@@ -41,8 +41,10 @@ const priorityWeight = { urgent:3, important:2, general:1 };
 const localChannel   = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL_NAME) : null;
 
 let deferredInstallPrompt = null;
-let pb                    = null;          // PocketBase client
+let pbUrl                 = '';            // active PocketBase URL (no trailing slash)
 let liveMode              = false;         // true when PocketBase is reachable
+let adminToken            = null;          // JWT from auth-with-password
+let adminUser             = null;          // { id, email, role }
 let cachedBroadcasts      = [];
 let cachedReads           = new Set();
 
@@ -125,9 +127,93 @@ function sortBroadcasts(items) {
   });
 }
 
-function isAdmin() { return liveMode && pb && pb.authStore.isValid && pb.authStore.model && pb.authStore.model.role === 'admin'; }
+function isAdmin() { return liveMode && adminToken && adminUser && adminUser.role === 'admin'; }
 
-// ── localStorage (demo) backend ───────────────────────────
+// ── fetch helper ───────────────────────────────────────────
+
+async function pbFetch(path, opts = {}) {
+  const url = pbUrl + path;
+  const hdrs = { ...opts.headers };
+  if (adminToken) hdrs['Authorization'] = adminToken;
+  let body = opts.body;
+  if (body && !(body instanceof FormData)) {
+    hdrs['Content-Type'] = 'application/json';
+    body = JSON.stringify(body);
+  }
+  const res = await fetch(url, { ...opts, headers: hdrs, body });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const e = await res.json(); msg = e.message || msg; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+// ── PocketBase live backend (raw fetch, zero SDK deps) ─────
+
+async function probePocketBase() {
+  if (!PB_URL) { els.connectBar?.classList.remove('hidden'); return false; }
+  pbUrl = PB_URL.replace(/\/+$/, '');
+  try {
+    const r = await fetch(pbUrl + '/api/health').then(r => r.json());
+    if (r.code !== 200) throw new Error('unhealthy');
+    els.connectBar?.classList.add('hidden');
+    // restore admin session if stored
+    const tok = sessionStorage.getItem('pfm_admin_token');
+    const usr = sessionStorage.getItem('pfm_admin_user');
+    if (tok && usr) {
+      try {
+        adminToken = tok; adminUser = JSON.parse(usr);
+        await pbFetch('/api/collections/users/records?perPage=1');
+      } catch { adminToken = null; adminUser = null; sessionStorage.removeItem('pfm_admin_token'); sessionStorage.removeItem('pfm_admin_user'); }
+    }
+    return true;
+  } catch (e) {
+    console.warn('Backend probe failed:', e.message);
+    els.connectBar?.classList.remove('hidden');
+    return false;
+  }
+}
+
+async function refreshFromLive() {
+  if (!liveMode) return;
+  try {
+    const [bData, rData] = await Promise.all([
+      pbFetch('/api/collections/broadcasts/records?perPage=500&filter=(is_active=true)&sort=-created'),
+      pbFetch('/api/collections/broadcast_reads/records?perPage=500&filter=(device_id=\'' + deviceId + '\')')
+    ]);
+    cachedBroadcasts = (bData.items || []).map(normaliseBroadcast);
+    cachedReads = new Set((rData.items || []).map(r => r.broadcast));
+    render();
+  } catch (e) { console.warn('Live refresh failed:', e.message); }
+}
+
+// polling — checks for new broadcasts every 3s
+let pollingTimer = null;
+let lastPollCreated = null;
+function startPolling() {
+  if (pollingTimer || !liveMode) return;
+  pollingTimer = setInterval(async () => {
+    if (!liveMode) return;
+    try {
+      const data = await pbFetch('/api/collections/broadcasts/records?perPage=1&sort=-created');
+      const latest = data.items?.[0];
+      if (latest && (!lastPollCreated || latest.created > lastPollCreated)) {
+        lastPollCreated = latest.created;
+        await refreshFromLive();
+      }
+    } catch { /* best effort */ }
+  }, 3000);
+}
+function stopPolling() { if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; } }
+
+async function initBackend() {
+  liveMode = await probePocketBase();
+  if (liveMode) { await refreshFromLive(); startPolling(); return; }
+  cachedBroadcasts = getLocalBroadcasts();
+}
+
+// ── localStorage (demo mode) ───────────────────────────────
 
 function getLocalBroadcasts() {
   try { const s = JSON.parse(localStorage.getItem(STORAGE_KEY)); return Array.isArray(s) ? s.map(normaliseBroadcast) : []; }
@@ -141,121 +227,40 @@ function saveLocalBroadcasts(items) {
   render();
 }
 
-// ── PocketBase live backend ───────────────────────────────
-
-async function probePocketBase() {
-  if (!window.PocketBase || !PB_URL) {
-    if (!PB_URL) els.connectBar?.classList.remove('hidden');
-    return false;
-  }
-  try {
-    pb = new PocketBase(PB_URL);
-    await pb.health.check();
-    els.connectBar?.classList.add('hidden');
-    if (pb.authStore.isValid) {
-      try { await pb.collection('users').authRefresh(); } catch { pb.authStore.clear(); }
-    }
-    return true;
-  } catch {
-    pb = null;
-    els.connectBar?.classList.remove('hidden');
-    return false;
-  }
-}
-
-async function refreshFromLive() {
-  if (!liveMode) return;
-  try {
-    const [broadcasts, reads] = await Promise.all([
-      pb.collection('broadcasts').getFullList({ filter:'is_active=true', sort:'-created', $autoCancel:false }),
-      pb.collection('broadcast_reads').getFullList({ filter:`device_id="${deviceId}"`, $autoCancel:false })
-    ]);
-    cachedBroadcasts = broadcasts.map(normaliseBroadcast);
-    cachedReads = new Set(reads.map(r => r.broadcast));
-    render();
-  } catch (e) { console.warn('Live refresh failed', e.message); }
-}
-
-function subscribeRealtime() {
-  if (!liveMode) return;
-  try {
-    pb.collection('broadcasts').subscribe('*', (e) => {
-      if (e.action === 'create') {
-        cachedBroadcasts = [normaliseBroadcast(e.record), ...cachedBroadcasts];
-        render();
-      } else {
-        refreshFromLive();
-      }
-    });
-    pb.collection('broadcast_reads').subscribe('*', () => refreshFromLive());
-  } catch (e) { console.warn('Realtime subscription failed', e.message); }
-}
-
-// Polling fallback — runs every 5s in case SSE doesn't work through the tunnel
-let pollingTimer = null;
-let lastPollAt = null;
-function startPolling() {
-  if (pollingTimer || !liveMode) return;
-  pollingTimer = setInterval(async () => {
-    if (!liveMode || !pb) return;
-    try {
-      const latest = await pb.collection('broadcasts').getList(1, 1, { sort:'-created', $autoCancel:false });
-      if (latest.items.length > 0) {
-        const latestCreated = latest.items[0].created;
-        if (!lastPollAt || !cachedBroadcasts.length || latestCreated > (cachedBroadcasts[0].createdAt || cachedBroadcasts[0].created || '')) {
-          lastPollAt = latestCreated;
-          await refreshFromLive();
-        }
-      }
-    } catch { /* silent */ }
-  }, 3000);
-}
-function stopPolling() { if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; } }
-
-async function initBackend() {
-  liveMode = await probePocketBase();
-  if (liveMode) {
-    await refreshFromLive();
-    subscribeRealtime();
-    startPolling();
-    return;
-  }
-  cachedBroadcasts = getLocalBroadcasts();
-}
-
 // ── broadcasts ────────────────────────────────────────────
 
 async function createBroadcast({ title, body, priority, imageFile }) {
   if (liveMode) {
     if (!isAdmin()) throw new Error('Admin access required');
-    const data = new FormData();
-    data.append('title', title);
-    data.append('message', body);
-    data.append('priority', priority || 'general');
-    data.append('created_by', pb.authStore.model.id);
-    data.append('is_active', 'true');
-    if (imageFile) data.append('image', imageFile);
-    await pb.collection('broadcasts').create(data, { $autoCancel:false });
-    // realtime picks up the change; also immediate refresh
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('message', body);
+    fd.append('priority', priority || 'general');
+    fd.append('created_by', adminUser.id);
+    fd.append('is_active', 'true');
+    if (imageFile) fd.append('image', imageFile);
+    await fetch(pbUrl + '/api/collections/broadcasts/records', {
+      method: 'POST',
+      headers: adminToken ? { 'Authorization': adminToken } : {},
+      body: fd
+    }).then(r => { if (!r.ok) return r.json().then(e => { throw new Error(e.message); }); return r.json(); });
+    lastPollCreated = new Date().toISOString();
     await refreshFromLive();
     return;
   }
-  const item = normaliseBroadcast({ id:crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`, title, body, priority, createdAt:new Date().toISOString(), readBy:[], isActive:true });
+  const item = normaliseBroadcast({ id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}`, title, body, priority, createdAt:new Date().toISOString(), readBy:[], isActive:true });
   saveLocalBroadcasts([item, ...getLocalBroadcasts()]);
 }
 
 async function markRead(id) {
   if (liveMode) {
     try {
-      await pb.collection('broadcast_reads').create({ broadcast:id, device_id:deviceId }, { $autoCancel:false });
+      await pbFetch('/api/collections/broadcast_reads/records', { method:'POST', body:{ broadcast:id, device_id:deviceId } });
     } catch (e) {
-      // duplicate (already marked) — ignore
-      if (!e.message?.includes('unique')) { console.error(e); showToast('Could not mark as read'); return; }
+      if (e.message?.includes('400') || e.message?.includes('unique') || e.message?.includes('duplicate')) { /* already read, ok */ }
+      else { console.error(e); showToast('Could not mark as read'); return; }
     }
-    cachedReads.add(id);
-    render();
-    showToast('Marked as read');
-    return;
+    cachedReads.add(id); render(); showToast('Marked as read'); return;
   }
   const updated = getLocalBroadcasts().map(i => { if (i.id !== id) return i; const s = new Set(i.readBy||[]); s.add(deviceId); return {...i, readBy:Array.from(s)}; });
   saveLocalBroadcasts(updated); showToast('Marked as read');
@@ -264,22 +269,25 @@ async function markRead(id) {
 // ── admin auth ────────────────────────────────────────────
 
 async function doLogin(email, password) {
-  await pb.collection('users').authWithPassword(email, password);
+  const data = await pbFetch('/api/collections/users/auth-with-password', { method:'POST', body:{ identity:email, password } });
+  adminToken = data.token;
+  adminUser = { id: data.record.id, email: data.record.email, role: data.record.role };
+  sessionStorage.setItem('pfm_admin_token', adminToken);
+  sessionStorage.setItem('pfm_admin_user', JSON.stringify(adminUser));
 }
 
 async function doLogout() {
-  pb.authStore.clear();
-  showLoginForm(false);
-  renderAdminState();
-  showToast('Admin locked');
+  adminToken = null; adminUser = null;
+  sessionStorage.removeItem('pfm_admin_token'); sessionStorage.removeItem('pfm_admin_user');
+  showLoginForm(false); renderAdminState(); showToast('Admin locked');
 }
 
 async function doForgotPassword(email) {
-  await pb.collection('users').requestPasswordReset(email);
+  await pbFetch('/api/collections/users/request-password-reset', { method:'POST', body:{ email } });
 }
 
 async function doResetPassword(token, password) {
-  await pb.collection('users').confirmPasswordReset(token, password, password);
+  await pbFetch('/api/collections/users/confirm-password-reset', { method:'POST', body:{ token, password, passwordConfirm:password } });
 }
 
 // ── rendering ─────────────────────────────────────────────
@@ -290,8 +298,9 @@ function createPostCard(item) {
   card.className = `post-card ${rd ? 'read' : 'unread'} ${sanitize(item.priority)}`;
 
   let imgHtml = '';
-  if (item.image && liveMode && pb) {
-    imgHtml = `<img src="${pb.files.getUrl(item, item.image)}" alt="" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-bottom:8px" />`;
+  if (item.image && liveMode && pbUrl) {
+    const imgUrl = typeof item.image === 'string' ? item.image : (item.image.filename || item.image);
+    imgHtml = `<img src="${pbUrl}/api/files/broadcasts/${item.id}/${imgUrl}" alt="" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-bottom:8px" />`;
   }
 
   card.innerHTML = `
@@ -343,7 +352,7 @@ function renderAdminState() {
 function renderBackendStatus() {
   if (!els.backendStatus) return;
   if (liveMode) {
-    els.backendStatus.innerHTML = `<strong>Live backend (PocketBase)</strong><span>Connected to ${sanitize(PB_URL)}. Realtime sync is active.</span>`;
+    els.backendStatus.innerHTML = `<strong>Live backend (PocketBase)</strong><span>Connected to ${sanitize(pbUrl)}. Updates every 3 seconds.</span>`;
     return;
   }
   els.backendStatus.innerHTML = '<strong>Demo mode</strong><span>Using localStorage. Start PocketBase and configure PB_URL in app.js for cross-device broadcasting with unlimited images.</span>';
@@ -447,7 +456,6 @@ function bindEvents() {
     if (liveMode) {
       showToast('Connected! Loading posts...');
       await refreshFromLive();
-      subscribeRealtime();
       startPolling();
     } else {
       showToast('Could not reach that server. Check the URL and try again.');
