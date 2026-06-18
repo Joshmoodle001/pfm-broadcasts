@@ -18,7 +18,9 @@
 // Local dev:  'http://127.0.0.1:8090'
 // Production: 'https://pb.yourdomain.com'  (behind nginx/caddy/Cloudflare Tunnel)
 // Set via ?pb_url=https://your-tunnel.trycloudflare.com, saved to localStorage
-let PB_URL = localStorage.getItem('pfm_pb_url') || 'https://karma-tips-numerical-stats.trycloudflare.com';
+// Default: direct LAN access. Change to tunnel URL for internet access.
+// For external access use a tunnel like: https://xxx.trycloudflare.com
+let PB_URL = localStorage.getItem('pfm_pb_url') || 'http://192.168.70.61:8090';
 const qp = new URLSearchParams(window.location.search);
 if (qp.get('pb_url')) { PB_URL = qp.get('pb_url'); localStorage.setItem('pfm_pb_url', PB_URL); history.replaceState(null, '', window.location.pathname + window.location.hash); }
 
