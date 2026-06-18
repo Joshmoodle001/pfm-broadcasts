@@ -1,21 +1,29 @@
 @echo off
-echo ===========================================
+title PFM Broadcasts Server
+echo =====================================
 echo  PFM Broadcasts - Starting Services
-echo ===========================================
+echo =====================================
 echo.
-echo Starting PocketBase on port 8090...
-start "PocketBase Server" /D "%~dp0" "%~dp0pocketbase.exe" serve --http=127.0.0.1:8090
+echo [1/2] Starting PocketBase...
+start "PocketBase" /MIN /D "%~dp0" "%~dp0pocketbase.exe" serve --http=127.0.0.1:8090
 timeout /t 3 /nobreak >nul
 
-echo Starting Cloudflare Tunnel...
+echo [2/2] Starting Cloudflare Tunnel...
 echo.
-echo === COPY THE URL BELOW (the https://...trycloudflare.com one) ===
+echo Tunnel URL will appear below after 15 seconds.
+echo COPY the https://...trycloudflare.com URL
 echo.
-start "Cloudflare Tunnel" /D "%~dp0" "%~dp0cloudflared.exe" tunnel --url http://127.0.0.1:8090
+start "PFM Tunnel" /MIN cmd /c "cd /d %~dp0 && cloudflared.exe tunnel --url http://127.0.0.1:8090"
+timeout /t 12 /nobreak >nul
+
 echo.
-echo Once you have the URL, open:
-echo   https://fmcg-merch-pwa.vercel.app
+echo =====================================================
+echo  Services are running in minimized windows.
+echo  PocketBase: http://127.0.0.1:8090
+echo  App URL:    https://fmcg-merch-pwa.vercel.app
+echo =====================================================
 echo.
-echo Paste the tunnel URL when the connect bar appears.
-echo ===========================================
+echo When the tunnel URL changes, update the URL in app.js
+echo and run: npx vercel --prod
+echo.
 pause
