@@ -17,7 +17,10 @@
 // Set PB_URL to your PocketBase server address.
 // Local dev:  'http://127.0.0.1:8090'
 // Production: 'https://pb.yourdomain.com'  (behind nginx/caddy/Cloudflare Tunnel)
-const PB_URL = localStorage.getItem('pfm_pb_url') || 'http://127.0.0.1:8090';
+// Set via ?pb_url=https://your-tunnel.trycloudflare.com, saved to localStorage
+let PB_URL = localStorage.getItem('pfm_pb_url') || 'http://127.0.0.1:8090';
+const qp = new URLSearchParams(window.location.search);
+if (qp.get('pb_url')) { PB_URL = qp.get('pb_url'); localStorage.setItem('pfm_pb_url', PB_URL); }
 
 const STORAGE_KEY  = 'pfm_broadcasts_items_v5';
 const DEVICE_KEY   = 'pfm_broadcasts_device_id_v5';
