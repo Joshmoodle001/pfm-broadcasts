@@ -18,7 +18,7 @@
 // Local dev:  'http://127.0.0.1:8090'
 // Production: 'https://pb.yourdomain.com'  (behind nginx/caddy/Cloudflare Tunnel)
 // Set via ?pb_url=https://your-tunnel.trycloudflare.com, saved to localStorage
-let PB_URL = localStorage.getItem('pfm_pb_url') || 'http://127.0.0.1:8090';
+let PB_URL = localStorage.getItem('pfm_pb_url') || '';
 const qp = new URLSearchParams(window.location.search);
 if (qp.get('pb_url')) { PB_URL = qp.get('pb_url'); localStorage.setItem('pfm_pb_url', PB_URL); history.replaceState(null, '', window.location.pathname + window.location.hash); }
 
@@ -144,7 +144,10 @@ function saveLocalBroadcasts(items) {
 // ── PocketBase live backend ───────────────────────────────
 
 async function probePocketBase() {
-  if (!window.PocketBase) return false;
+  if (!window.PocketBase || !PB_URL) {
+    if (!PB_URL) els.connectBar?.classList.remove('hidden');
+    return false;
+  }
   try {
     pb = new PocketBase(PB_URL);
     await pb.health.check();

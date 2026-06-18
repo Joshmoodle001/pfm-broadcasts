@@ -706,6 +706,15 @@
     </header>
 
     <main>
+      <div id="connectBar" class="status-banner hidden" style="margin:0 0 12px;text-align:center">
+        <strong>Not connected to server</strong>
+        <span>Paste your PocketBase URL below to see broadcasts.</span>
+        <form id="connectForm" style="display:flex;gap:8px;margin-top:8px;max-width:500px;margin-left:auto;margin-right:auto">
+          <input id="connectInput" type="url" placeholder="https://your-tunnel.trycloudflare.com" style="flex:1;min-width:0" />
+          <button type="submit" style="white-space:nowrap">Connect</button>
+        </form>
+      </div>
+
       <section class="screen active" id="screen-welcome" aria-labelledby="welcomeTitle">
         <div class="welcome-layout">
           <article class="hero">
@@ -788,15 +797,6 @@
               <p>Read the latest broadcasts from PFM.</p>
             </div>
             <span class="pill" id="postCount">0 posts</span>
-          </div>
-
-          <div id="connectBar" class="status-banner hidden" style="margin-bottom:8px">
-            <strong>Not connected to server</strong>
-            <span>Paste your PocketBase server URL below to connect.</span>
-            <form id="connectForm" style="display:flex;gap:8px;margin-top:8px">
-              <input id="connectInput" type="url" placeholder="https://your-tunnel.trycloudflare.com" style="flex:1;min-width:0" />
-              <button type="submit" style="white-space:nowrap">Connect</button>
-            </form>
           </div>
 
           <div class="posts-list" id="postsList"></div>
