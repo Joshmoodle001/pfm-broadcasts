@@ -20,7 +20,15 @@
 // Set via ?pb_url=https://your-tunnel.trycloudflare.com, saved to localStorage
 let PB_URL = localStorage.getItem('pfm_pb_url') || 'http://127.0.0.1:8090';
 const qp = new URLSearchParams(window.location.search);
-if (qp.get('pb_url')) { PB_URL = qp.get('pb_url'); localStorage.setItem('pfm_pb_url', PB_URL); }
+if (qp.get('pb_url')) { PB_URL = qp.get('pb_url'); localStorage.setItem('pfm_pb_url', PB_URL); history.replaceState(null, '', window.location.pathname + window.location.hash); }
+
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+if (isStandalone) document.body.classList.add('standalone');
+
+// Listen for display-mode changes (e.g. after install)
+window.matchMedia('(display-mode: standalone)').addEventListener('change', e => {
+  if (e.matches) document.body.classList.add('standalone');
+});
 
 const STORAGE_KEY  = 'pfm_broadcasts_items_v5';
 const DEVICE_KEY   = 'pfm_broadcasts_device_id_v5';
@@ -339,7 +347,13 @@ function renderInstallSteps() {
   els.installSteps.innerHTML = '<div><strong>Desktop:</strong> use the install icon in Chrome or Edge if it appears in the address bar.</div>'; els.installBtn.disabled = true; els.installBtn.textContent = 'Install option not shown yet';
 }
 
-function render() { renderPosts(); renderRecent(); renderAdminState(); renderInstallSteps(); }
+function render() {
+  if (isStandalone) document.body.classList.add('standalone');
+  renderPosts();
+  renderRecent();
+  renderAdminState();
+  renderInstallSteps();
+}
 
 function switchScreen(screen) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === `screen-${screen}`));

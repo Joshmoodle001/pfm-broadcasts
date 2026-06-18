@@ -588,6 +588,7 @@
     .recent-item span { color: var(--muted); font-size: 12px; font-weight: 700; }
 
     .hidden { display: none !important; }
+    .standalone .install-only { display: none !important; }
 
     .bottom-nav {
       position: fixed;
@@ -719,7 +720,7 @@
             <div>
               <div class="hero-actions">
                 <button type="button" data-screen="posts">View Posts</button>
-                <button class="btn-gold" type="button" data-screen="install">Install App</button>
+                <button class="btn-gold install-only" type="button" data-screen="install">Install App</button>
               </div>
               <div class="hero-note">
                 <strong>✓</strong>
@@ -728,7 +729,7 @@
             </div>
           </article>
 
-          <aside class="install-card" aria-labelledby="quickInstallTitle">
+          <aside class="install-card install-only" aria-labelledby="quickInstallTitle">
             <div class="install-heading">
               <div class="install-icon">↓</div>
               <div>
@@ -794,7 +795,7 @@
           <aside class="install-card desktop-panel">
             <h2>About PFM Broadcasts</h2>
             <p>Simple company communication. Admin posts once, and every app instance receives the broadcast when the backend is connected.</p>
-            <button class="btn-secondary" type="button" data-screen="install">Install on phone</button>
+            <button class="btn-secondary install-only" type="button" data-screen="install">Install on phone</button>
           </aside>
         </div>
       </section>
