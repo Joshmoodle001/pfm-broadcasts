@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="PFM Broadcasts is a simple installable web app for company-wide broadcasts." />
+  <meta name="application-name" content="PFM Broadcasts" />
+  <meta name="theme-color" content="#001c52" />
+  <meta name="color-scheme" content="light" />
+  <meta name="format-detection" content="telephone=no" />
+
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="PFM Broadcasts" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png" />
+
+  <title>PFM Broadcasts</title>
+
+  <style>
+    :root {
+      --pfm-blue: #001c52;
+      --pfm-blue-2: #07398f;
+      --pfm-blue-3: #0b4bd3;
+      --pfm-gold: #ffc400;
+      --pfm-gold-2: #f2a900;
+      --pfm-red: #d71920;
+      --pfm-orange: #f59e0b;
+      --pfm-green: #15803d;
+      --ink: #101828;
+      --muted: #667085;
+      --line: #d8e0ee;
+      --soft: #f4f7fc;
+      --card: #ffffff;
+      --shadow-sm: 0 8px 24px rgba(0, 28, 82, .08);
+      --shadow-lg: 0 24px 70px rgba(0, 28, 82, .16);
+      --radius: 24px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      min-height: 100%;
+      background: var(--pfm-blue);
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(132deg, transparent 0 78%, rgba(255,196,0,.95) 78% 83%, transparent 83% 100%) top right / min(580px, 100vw) 300px no-repeat,
+        radial-gradient(circle at top left, rgba(7,57,143,.12), transparent 34rem),
+        linear-gradient(180deg, #ffffff 0%, #f5f7fb 100%);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      overflow-x: hidden;
+    }
+
+    img { max-width: 100%; }
+
+    button,
+    input,
+    textarea,
+    select { font: inherit; }
+
+    button {
+      min-height: 50px;
+      border: 0;
+      border-radius: 16px;
+      padding: 13px 18px;
+      background: linear-gradient(135deg, var(--pfm-blue-2), var(--pfm-blue));
+      color: #fff;
+      font-weight: 850;
+      cursor: pointer;
+      box-shadow: 0 13px 26px rgba(0, 28, 82, .18);
+      touch-action: manipulation;
+      transition: transform .14s ease, box-shadow .14s ease, opacity .14s ease, background .14s ease;
+    }
+
+    button:hover { box-shadow: 0 16px 30px rgba(0, 28, 82, .23); }
+    button:active { transform: translateY(1px); }
+    button:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+
+    .btn-secondary {
+      background: #fff;
+      color: var(--pfm-blue);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    .btn-gold {
+      background: linear-gradient(135deg, var(--pfm-gold), var(--pfm-gold-2));
+      color: var(--pfm-blue);
+      box-shadow: 0 13px 26px rgba(242, 169, 0, .24);
+    }
+
+    .btn-ghost {
+      min-height: 40px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.8);
+      color: var(--pfm-blue);
+      border: 1px solid rgba(0,28,82,.13);
+      box-shadow: none;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .btn-link {
+      min-height: auto;
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--pfm-blue-2);
+      box-shadow: none;
+      font-weight: 800;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px 15px;
+      color: var(--ink);
+      outline: none;
+      transition: border-color .14s ease, box-shadow .14s ease;
+    }
+
+    textarea {
+      min-height: 140px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--pfm-blue-2);
+      box-shadow: 0 0 0 4px rgba(7,57,143,.12);
+    }
+
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 850;
+      color: var(--pfm-blue);
+    }
+
+    .app {
+      width: min(1120px, 100%);
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0 auto;
+      padding: calc(14px + var(--safe-top)) 14px calc(84px + var(--safe-bottom));
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: calc(10px + var(--safe-top)) 0 12px;
+      margin-top: calc(-14px - var(--safe-top));
+      backdrop-filter: blur(16px);
+    }
+
+    .brand-mini {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mini img {
+      width: 84px;
+      height: 42px;
+      object-fit: contain;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: var(--shadow-sm);
+      padding: 3px;
+    }
+
+    .brand-mini span {
+      display: none;
+      color: var(--pfm-blue);
+      font-size: 12px;
+      font-weight: 950;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      line-height: 1.1;
+    }
+
+    .screen { display: none; animation: rise .18s ease-out; }
+    .screen.active { display: block; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .welcome-layout {
+      display: grid;
+      gap: 16px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      min-height: calc(100dvh - 122px - var(--safe-top) - var(--safe-bottom));
+      border-radius: 32px;
+      background: linear-gradient(145deg, var(--pfm-blue) 0%, #07398f 100%);
+      color: #fff;
+      padding: clamp(22px, 6vw, 44px);
+      display: grid;
+      align-content: space-between;
+      gap: 42px;
+      box-shadow: var(--shadow-lg);
+      isolation: isolate;
+    }
+
+    .hero::before,
+    .hero::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+      z-index: -1;
+      transform: rotate(-52deg);
+      border-radius: 999px;
+    }
+
+    .hero::before {
+      right: -48px;
+      top: -92px;
+      width: 82px;
+      height: 330px;
+      background: linear-gradient(180deg, var(--pfm-gold), var(--pfm-gold-2));
+    }
+
+    .hero::after {
+      right: 86px;
+      bottom: -160px;
+      width: 42px;
+      height: 290px;
+      background: rgba(255,255,255,.12);
+    }
+
+    .hero-logo {
+      width: min(190px, 65vw);
+      padding: 12px;
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: 0 15px 35px rgba(0,0,0,.18);
+    }
+
+    .hero-logo img { display: block; width: 100%; }
+
+    .hero h1 {
+      margin: 28px 0 0;
+      font-size: clamp(44px, 14vw, 88px);
+      line-height: .88;
+      letter-spacing: -.07em;
+      max-width: 720px;
+    }
+
+    .hero p {
+      max-width: 620px;
+      margin: 18px 0 0;
+      color: rgba(255,255,255,.84);
+      font-size: clamp(16px, 4.2vw, 20px);
+      line-height: 1.48;
+    }
+
+    .hero-actions {
+      display: grid;
+      gap: 12px;
+    }
+
+    .hero-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 18px;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 18px;
+      background: rgba(255,255,255,.08);
+      color: rgba(255,255,255,.82);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .install-card,
+    .panel,
+    .post-card,
+    .empty,
+    .admin-card {
+      border: 1px solid rgba(216,224,238,.9);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.94);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .install-card {
+      padding: 20px;
+      display: grid;
+      gap: 15px;
+    }
+
+    .install-heading {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .install-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--pfm-gold), var(--pfm-gold-2));
+      color: var(--pfm-blue);
+      font-size: 24px;
+      font-weight: 950;
+      flex: 0 0 auto;
+    }
+
+    .install-card h2,
+    .panel h2,
+    .admin-card h2 { margin: 0; color: var(--pfm-blue); }
+
+    .install-card p,
+    .panel p,
+    .admin-card p,
+    .empty p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .steps {
+      display: grid;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .steps strong { color: var(--pfm-blue); }
+
+    .posts-shell {
+      display: grid;
+      gap: 16px;
+    }
+
+    .page-title {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 2px 2px;
+    }
+
+    .page-title h1 {
+      margin: 0;
+      color: var(--pfm-blue);
+      font-size: clamp(30px, 8vw, 56px);
+      line-height: .95;
+      letter-spacing: -.05em;
+    }
+
+    .page-title p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.4;
+      font-weight: 650;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border-radius: 999px;
+      padding: 7px 10px;
+      background: #fff;
+      color: var(--pfm-blue);
+      border: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .posts-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .post-card {
+      overflow: hidden;
+      padding: 17px;
+      display: grid;
+      gap: 12px;
+      position: relative;
+    }
+
+    .post-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: var(--pfm-blue-2);
+    }
+
+    .post-card.urgent::before { background: var(--pfm-red); }
+    .post-card.important::before { background: var(--pfm-gold-2); }
+    .post-card.general::before { background: var(--pfm-blue-2); }
+    .post-card.read { opacity: .82; }
+
+    .post-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .post-card h3 {
+      margin: 0;
+      color: var(--ink);
+      font-size: clamp(19px, 5.5vw, 26px);
+      letter-spacing: -.02em;
+      line-height: 1.05;
+    }
+
+    .post-card p {
+      margin: 0;
+      color: #344054;
+      line-height: 1.52;
+      white-space: pre-wrap;
+    }
+
+    .tag {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border: 1px solid transparent;
+    }
+
+    .tag.urgent { color: var(--pfm-red); background: #fff1f2; border-color: #fecdd3; }
+    .tag.important { color: #a15c00; background: #fffbeb; border-color: #fed7aa; }
+    .tag.general { color: var(--pfm-blue-2); background: #eff6ff; border-color: #bfdbfe; }
+    .tag.read { color: var(--pfm-green); background: #ecfdf3; border-color: #bbf7d0; }
+
+    .post-meta {
+      display: grid;
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .post-meta button { width: 100%; }
+
+    .empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .admin-shell {
+      display: grid;
+      gap: 16px;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    .admin-card {
+      padding: clamp(18px, 4vw, 28px);
+      display: grid;
+      gap: 18px;
+    }
+
+    .admin-logo {
+      width: 132px;
+      margin: 0 auto;
+      display: block;
+    }
+
+    .admin-locked {
+      max-width: 460px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .form-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .priority-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .priority-option {
+      position: relative;
+      display: block;
+    }
+
+    .priority-option input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .priority-option span {
+      display: grid;
+      place-items: center;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      color: var(--pfm-blue);
+      font-size: 12px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .priority-option input:checked + span {
+      border-color: var(--pfm-blue-2);
+      background: #eff6ff;
+      box-shadow: 0 0 0 4px rgba(7,57,143,.10);
+    }
+
+    .admin-layout {
+      display: grid;
+      gap: 14px;
+    }
+
+    .recent-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .recent-item {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      display: grid;
+      gap: 4px;
+    }
+
+    .recent-item strong { color: var(--ink); }
+    .recent-item span { color: var(--muted); font-size: 12px; font-weight: 700; }
+
+    .hidden { display: none !important; }
+
+    .bottom-nav {
+      position: fixed;
+      z-index: 60;
+      left: 50%;
+      bottom: calc(12px + var(--safe-bottom));
+      transform: translateX(-50%);
+      width: min(450px, calc(100% - 28px));
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      padding: 8px;
+      border-radius: 22px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(216,224,238,.9);
+      box-shadow: 0 18px 50px rgba(0,28,82,.18);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav-btn {
+      min-height: 48px;
+      padding: 10px;
+      border-radius: 16px;
+      background: transparent;
+      color: var(--muted);
+      box-shadow: none;
+    }
+
+    .nav-btn.active {
+      background: var(--pfm-blue);
+      color: #fff;
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 80;
+      left: 50%;
+      bottom: calc(88px + var(--safe-bottom));
+      transform: translate(-50%, 18px);
+      opacity: 0;
+      pointer-events: none;
+      background: var(--pfm-blue);
+      color: #fff;
+      padding: 12px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 850;
+      box-shadow: 0 18px 50px rgba(0,28,82,.22);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .status-banner {
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .status-banner strong { color: var(--pfm-blue); }
+
+    @media (min-width: 620px) {
+      .brand-mini span { display: block; }
+      .hero-actions { grid-template-columns: repeat(2, minmax(0, 220px)); }
+      .post-meta { grid-template-columns: 1fr auto; }
+      .post-meta button { width: auto; }
+      .form-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (min-width: 860px) {
+      .app { padding: calc(18px + var(--safe-top)) 24px 34px; }
+      .topbar { margin-top: calc(-18px - var(--safe-top)); padding-top: calc(14px + var(--safe-top)); }
+      .welcome-layout { grid-template-columns: minmax(0, 1.15fr) 390px; align-items: stretch; }
+      .hero { min-height: 620px; }
+      .install-card { align-content: start; }
+      .posts-shell { grid-template-columns: minmax(0, 1fr) 330px; align-items: start; }
+      .page-title { grid-column: 1 / -1; }
+      .desktop-panel { display: grid; }
+      .admin-layout { grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); align-items: start; }
+      .bottom-nav { display: none; }
+    }
+
+    @media (max-width: 360px) {
+      .priority-row { grid-template-columns: 1fr; }
+      .post-top { display: grid; }
+      button { padding-left: 14px; padding-right: 14px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .001ms !important;
+        transition-duration: .001ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <button class="brand-mini btn-link" type="button" data-screen="welcome" aria-label="Go to welcome screen">
+        <img src="assets/pfm-mark-wide.png" alt="PFM logo" />
+        <span>Professional Field<br>Marketing</span>
+      </button>
+      <button class="btn-ghost" type="button" data-screen="admin" aria-label="Open admin access">🔒 Admin</button>
+    </header>
+
+    <main>
+      <section class="screen active" id="screen-welcome" aria-labelledby="welcomeTitle">
+        <div class="welcome-layout">
+          <article class="hero">
+            <div>
+              <div class="hero-logo">
+                <img src="assets/pfm-logo-lockup.png" alt="Professional Field Marketing logo" />
+              </div>
+              <h1 id="welcomeTitle">Welcome to PFM Broadcasts</h1>
+              <p>Company broadcasts in one simple place. Open the app, view posts, and stay informed.</p>
+            </div>
+
+            <div>
+              <div class="hero-actions">
+                <button type="button" data-screen="posts">View Posts</button>
+                <button class="btn-gold" type="button" data-screen="install">Install App</button>
+              </div>
+              <div class="hero-note">
+                <strong>✓</strong>
+                <span>Designed for mobile first, with a simple desktop admin experience for posting broadcasts.</span>
+              </div>
+            </div>
+          </article>
+
+          <aside class="install-card" aria-labelledby="quickInstallTitle">
+            <div class="install-heading">
+              <div class="install-icon">↓</div>
+              <div>
+                <h2 id="quickInstallTitle">Install on Android</h2>
+                <p>Open this website in Chrome, then add it to the home screen.</p>
+              </div>
+            </div>
+            <div class="steps">
+              <div><strong>1.</strong> Open the live PFM Broadcasts link in Chrome.</div>
+              <div><strong>2.</strong> Tap the browser menu or the install prompt.</div>
+              <div><strong>3.</strong> Tap <strong>Install</strong> or <strong>Add to Home screen</strong>.</div>
+            </div>
+            <button type="button" id="installFromWelcomeBtn">Install App</button>
+            <button class="btn-secondary" type="button" data-screen="posts">Skip and view posts</button>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-install" aria-labelledby="installTitle">
+        <div class="posts-shell">
+          <div class="page-title">
+            <div>
+              <h1 id="installTitle">Install App</h1>
+              <p>Add PFM Broadcasts to your phone for quick access.</p>
+            </div>
+          </div>
+
+          <article class="install-card">
+            <div class="install-heading">
+              <div class="install-icon">📱</div>
+              <div>
+                <h2>Android website install</h2>
+                <p>Best used through Chrome on Android.</p>
+              </div>
+            </div>
+            <button type="button" id="installBtn">Check install option</button>
+            <div class="steps" id="installSteps"></div>
+          </article>
+
+          <aside class="install-card">
+            <h2>iPhone</h2>
+            <div class="steps">
+              <div><strong>1.</strong> Open the site in Safari.</div>
+              <div><strong>2.</strong> Tap the Share button.</div>
+              <div><strong>3.</strong> Choose <strong>Add to Home Screen</strong>.</div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-posts" aria-labelledby="postsTitle">
+        <div class="posts-shell">
+          <div class="page-title">
+            <div>
+              <h1 id="postsTitle">Posts</h1>
+              <p>Read the latest broadcasts from PFM.</p>
+            </div>
+            <span class="pill" id="postCount">0 posts</span>
+          </div>
+
+          <div class="posts-list" id="postsList"></div>
+
+          <aside class="install-card desktop-panel">
+            <h2>About PFM Broadcasts</h2>
+            <p>Simple company communication. Admin posts once, and every app instance receives the broadcast when the backend is connected.</p>
+            <button class="btn-secondary" type="button" data-screen="install">Install on phone</button>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-admin" aria-labelledby="adminTitle">
+        <div class="admin-shell">
+          <div class="page-title">
+            <div>
+              <h1 id="adminTitle">Admin</h1>
+              <p>Locked area for posting broadcasts.</p>
+            </div>
+          </div>
+
+          <article class="admin-card admin-locked" id="adminLoginCard">
+            <img class="admin-logo" src="assets/pfm-logo-lockup.png" alt="PFM logo" />
+            <div>
+              <h2>Admin Access</h2>
+              <p>Only authorised admins can create and send broadcasts.</p>
+            </div>
+
+            <form class="form-grid" id="adminLoginForm">
+              <label>
+                Email address
+                <input id="adminEmail" name="email" type="email" autocomplete="username" placeholder="admin@pfm.co.za" required />
+              </label>
+              <label>
+                Password
+                <input id="adminPassword" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required />
+              </label>
+              <button type="submit">Unlock Admin</button>
+              <button class="btn-link" type="button" id="showResetBtn">Forgot password?</button>
+            </form>
+
+            <form class="form-grid hidden" id="resetPasswordForm">
+              <label>
+                Admin email
+                <input id="resetEmail" name="resetEmail" type="email" autocomplete="email" placeholder="admin@pfm.co.za" required />
+              </label>
+              <button type="submit">Send Reset Email</button>
+              <button class="btn-link" type="button" id="backToLoginBtn">Back to login</button>
+            </form>
+
+            <form class="form-grid hidden" id="newPasswordForm">
+              <label>
+                New password
+                <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Enter new password" required />
+              </label>
+              <button type="submit">Update Password</button>
+            </form>
+          </article>
+
+          <div class="admin-layout hidden" id="adminCenter">
+            <article class="admin-card">
+              <div>
+                <h2>Broadcast Center</h2>
+                <p>Create a post and send it to the whole app.</p>
+              </div>
+
+              <form class="form-grid" id="broadcastForm">
+                <label>
+                  Broadcast title
+                  <input id="title" name="title" maxlength="80" placeholder="Example: Price Update Effective Today" required />
+                </label>
+                <label>
+                  Message
+                  <textarea id="body" name="body" maxlength="700" placeholder="Type the broadcast message here..." required></textarea>
+                </label>
+                <label>
+                  Image (optional)
+                  <input id="broadcastImage" name="image" type="file" accept="image/jpeg,image/png,image/webp" style="padding:10px" />
+                </label>
+                <label>
+                  Priority
+                  <div class="priority-row" role="radiogroup" aria-label="Broadcast priority">
+                    <label class="priority-option"><input type="radio" name="priority" value="urgent" /><span>Urgent</span></label>
+                    <label class="priority-option"><input type="radio" name="priority" value="important" checked /><span>Important</span></label>
+                    <label class="priority-option"><input type="radio" name="priority" value="general" /><span>General</span></label>
+                  </div>
+                </label>
+                <button type="submit">Send Broadcast</button>
+              </form>
+            </article>
+
+            <aside class="admin-card">
+              <h2>Admin Tools</h2>
+              <div class="status-banner" id="backendStatus"></div>
+              <div class="form-actions">
+                <button class="btn-secondary" type="button" id="seedBtn">Add demo posts</button>
+                <button class="btn-secondary" type="button" id="clearBtn">Clear demo posts</button>
+                <button class="btn-secondary" type="button" id="lockAdminBtn">Lock admin</button>
+              </div>
+              <div>
+                <h2>Recent</h2>
+                <div class="recent-list" id="recentList"></div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="bottom-nav" aria-label="Main navigation">
+    <button class="nav-btn active" type="button" data-screen="welcome">Welcome</button>
+    <button class="nav-btn" type="button" data-screen="posts">Posts</button>
+  </nav>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/pocketbase@0.21.5/dist/pocketbase.umd.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
