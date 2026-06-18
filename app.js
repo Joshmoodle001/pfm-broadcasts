@@ -172,16 +172,45 @@ async function refreshFromLive() {
 function subscribeRealtime() {
   if (!liveMode) return;
   try {
-    pb.collection('broadcasts').subscribe('*', () => refreshFromLive(), { $autoCancel:false });
-    pb.collection('broadcast_reads').subscribe('*', () => refreshFromLive(), { $autoCancel:false });
+    pb.collection('broadcasts').subscribe('*', (e) => {
+      if (e.action === 'create') {
+        cachedBroadcasts = [normaliseBroadcast(e.record), ...cachedBroadcasts];
+        render();
+      } else {
+        refreshFromLive();
+      }
+    });
+    pb.collection('broadcast_reads').subscribe('*', () => refreshFromLive());
   } catch (e) { console.warn('Realtime subscription failed', e.message); }
 }
+
+// Polling fallback — runs every 5s in case SSE doesn't work through the tunnel
+let pollingTimer = null;
+let lastPollAt = null;
+function startPolling() {
+  if (pollingTimer || !liveMode) return;
+  pollingTimer = setInterval(async () => {
+    if (!liveMode || !pb) return;
+    try {
+      const latest = await pb.collection('broadcasts').getList(1, 1, { sort:'-created', $autoCancel:false });
+      if (latest.items.length > 0) {
+        const latestCreated = latest.items[0].created;
+        if (!lastPollAt || !cachedBroadcasts.length || latestCreated > (cachedBroadcasts[0].createdAt || cachedBroadcasts[0].created || '')) {
+          lastPollAt = latestCreated;
+          await refreshFromLive();
+        }
+      }
+    } catch { /* silent */ }
+  }, 3000);
+}
+function stopPolling() { if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; } }
 
 async function initBackend() {
   liveMode = await probePocketBase();
   if (liveMode) {
     await refreshFromLive();
     subscribeRealtime();
+    startPolling();
     return;
   }
   cachedBroadcasts = getLocalBroadcasts();
