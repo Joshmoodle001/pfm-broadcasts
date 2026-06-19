@@ -96,8 +96,8 @@ async function initSB() {
       const p=await sb.from('admin_profiles').select('is_admin').eq('user_id',data.session.user.id).eq('is_admin',true).maybeSingle();
       sessionStorage.setItem(ADM,p.data?'1':'');
     }
-    const{count}=await sb.from('admin_profiles').select('*',{count:'exact',head:true}).eq('is_admin',true);
-    if(el.showSignup)el.showSignup.classList.toggle('hidden',(count||0)>0);
+    // Lazy check - only hide signup after first admin exists
+    try{const c=await sb.from('admin_profiles').select('user_id',{count:'exact',head:true}).eq('is_admin',true);if(el.showSignup)el.showSignup.classList.toggle('hidden',(c.count||0)>0)}catch{}
     return true;
   }catch(e){console.warn('SB init:',e.message);sb=null;return false}
 }
