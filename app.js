@@ -126,6 +126,9 @@ async function init() {
   }
 
   await refresh(); sub();
+  // If installed as PWA, go straight to posts
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (standalone && !location.hash) { switchScreen('posts'); return; }
   const s=(location.hash||'#welcome').replace('#',''); if(document.querySelector('#screen-'+s)) switchScreen(s);
 }
 
