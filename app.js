@@ -120,6 +120,13 @@ function sub() {
 
 function admin() { return live&&sessionStorage.getItem(ADM)==='1'; }
 
+async function deleteBroadcast(id) {
+  if(!live||!admin()){toast('Admin required');return}
+  const{error}=await sb.from('broadcasts').update({is_active:false}).eq('id',id);
+  if(error){toast(error.message);return}
+  await refresh();toast('Deleted');
+}
+
 async function createBroadcast({title,body,priority}) {
   if(live){const{error}=await sb.from('broadcasts').insert({title,message:body,priority:priority||'general',is_active:true});if(error)throw error;await refresh();return}
   const item=norm({id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}`,title,body,priority,created_at:new Date().toISOString(),readBy:[],is_active:true});
@@ -160,7 +167,7 @@ function card(item) {
 
 function recentItem(item) {
   const d=document.createElement('div');d.className='recent-item';
-  d.innerHTML=`<strong>${esc(item.title)}</strong><span>${pl(item.priority)} - ${fmt(item.created_at)}</span>`;return d;
+  d.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>${esc(item.title)}</strong><br><span>${pl(item.priority)} - ${fmt(item.created_at)}</span></div><button class="btn-link" type="button" data-delete="${esc(item.id)}" style="color:#d71920;font-size:12px;white-space:nowrap">Delete</button></div>`;return d;
 }
 
 function renderPosts() {
@@ -254,6 +261,7 @@ function bind() {
   document.addEventListener('click',async e=>{
     const s=e.target.closest('[data-screen]'); if(s){switchScreen(s.dataset.screen);return}
     const r=e.target.closest('[data-read]'); if(r){await mark(r.dataset.read);return}
+    const del=e.target.closest('[data-delete]'); if(del){if(confirm('Delete this broadcast?')){await deleteBroadcast(del.dataset.delete);}return}
   });
 
   el.loginForm?.addEventListener('submit',async e=>{
