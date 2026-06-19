@@ -64,10 +64,17 @@ async function create() {
 async function del(id) { await sb.from('broadcasts').update({is_active:false}).eq('id',id); await refresh(); toast('Deleted'); }
 
 function renderBody(txt) {
-  let html = esc(txt);
-  // Detect image URLs and render as images
-  html = html.replace(/(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?)/gi, '<img src="$1" loading="lazy" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin:8px 0;display:block" onerror="this.style.display=\'none\'" />');
-  return html;
+  let safe = esc(txt);
+  let imgs = '';
+  // Match: standard image extensions OR unsplash/placeholder image URLs
+  safe = safe.replace(/(https?:\/\/\S+)/gi, (url) => {
+    if (/\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(url) || /images\.unsplash\.com\/photo-/.test(url) || /picsum\.photos/.test(url)) {
+      imgs += '<img src="'+url+'" loading="lazy" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin:8px 0;display:block" onerror="this.remove()" />';
+      return '';
+    }
+    return url;
+  });
+  return imgs + safe;
 }
 
 function renderPosts() {
