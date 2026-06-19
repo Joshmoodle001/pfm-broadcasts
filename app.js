@@ -100,7 +100,9 @@ function renderBody(txt){
       btns+='<div class="vid-card" data-vid="vimeo-'+isVimeo[1]+'" style="position:relative;width:100%;border-radius:12px;overflow:hidden;cursor:pointer;margin:8px 0;background:#000"><img src="https://vumbnail.com/'+isVimeo[1]+'.jpg" loading="lazy" style="width:100%;display:block;opacity:0.7" onerror="this.style.display=\'none\'" /><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:52px;52px;border-radius:50%;background:rgba(255,0,0,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.4)"><span style="color:#fff;font-size:22px;margin-left:4px">&#9654;</span></div></div></div>';
       return'';
     }
-    return url;
+    // All other URLs become clickable links
+    const short=url.length>50?url.slice(0,47)+'...':url;
+    return '<a href="'+url+'" target="_blank" rel="noopener" style="color:var(--pfm-blue-2);text-decoration:underline;word-break:break-all">'+short+'</a>';
   });
   return btns+safe;
 }
