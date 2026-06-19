@@ -78,9 +78,16 @@ function renderBody(txt){
   let safe=esc(txt),btns='';
   const loaded=getImgCache();
   safe=safe.replace(/(https?:\/\/\S+)/gi,(url)=>{
-    if(/\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(url)||/images\.unsplash\.com\/photo-/.test(url)||/picsum\.photos/.test(url)){
+    const isImg=/\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(url)||/images\.unsplash\.com\/photo-/.test(url)||/picsum\.photos/.test(url);
+    const isVid=/\.(mp4|webm|mov)(\?\S*)?$/i.test(url)||/youtube\.com\/watch\?v=/.test(url)||/youtu\.be\//.test(url)||/vimeo\.com\//.test(url);
+    if(isImg){
       if(loaded[url]){btns+='<img src="'+url+'" loading="lazy" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin:8px 0" onerror="this.remove()" />';}
       else{btns+='<button class="img-load" data-img="'+url+'" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:var(--soft);color:var(--pfm-blue-2);font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center">Tap to view image</button>';}
+      return'';
+    }
+    if(isVid){
+      if(/youtube|youtu\.be|vimeo/.test(url)){btns+='<a href="'+url+'" target="_blank" rel="noopener" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:#fff0f0;color:#d71920;font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center;text-decoration:none">Watch video (opens in new tab)</a>';}
+      else{btns+='<button class="vid-load" data-vid="'+url+'" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:#fff0f0;color:#d71920;font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center">Tap to play video</button>';}
       return'';
     }
     return url;
@@ -155,6 +162,7 @@ document.addEventListener('click',async e=>{
   const r=e.target.closest('[data-read]');if(r){if(!live)return;await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'});reads.add(r.dataset.read);render();toast('Marked as read');return}
   const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
     const img=e.target.closest('.img-load');if(img){saveImgCache(img.dataset.img);const el=document.createElement('img');el.src=img.dataset.img;el.loading='lazy';el.style.cssText='width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin-top:6px';el.onerror=()=>el.remove();try{img.replaceWith(el)}catch{render()};return}
+    const vid=e.target.closest('.vid-load');if(vid){const el=document.createElement('video');el.src=vid.dataset.vid;el.controls=true;el.preload='none';el.style.cssText='width:100%;max-height:300px;border-radius:12px;display:block;margin-top:6px;background:#000';el.onerror=()=>el.remove();try{vid.replaceWith(el)}catch{render()};return}
 });
 
 E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();toast('Unlocked');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
