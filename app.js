@@ -154,7 +154,7 @@ document.addEventListener('click',async e=>{
   const s=e.target.closest('[data-screen]');if(s){switchScreen(s.dataset.screen);return}
   const r=e.target.closest('[data-read]');if(r){if(!live)return;await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'});reads.add(r.dataset.read);render();toast('Marked as read');return}
   const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
-  const img=e.target.closest('.img-load');if(img){img.style.pointerEvents='none';const el=document.createElement('img');el.src=img.dataset.img;el.loading='lazy';el.style.cssText='width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin-top:6px';el.onerror=()=>{el.remove();img.style.pointerEvents=''};el.onload=()=>{saveImgCache(img.dataset.img);img.replaceWith(el)};return}
+    const img=e.target.closest('.img-load');if(img){saveImgCache(img.dataset.img);const el=document.createElement('img');el.src=img.dataset.img;el.loading='lazy';el.style.cssText='width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin-top:6px';el.onerror=()=>el.remove();try{img.replaceWith(el)}catch{render()};return}
 });
 
 E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();toast('Unlocked');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
