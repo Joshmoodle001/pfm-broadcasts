@@ -79,15 +79,25 @@ function renderBody(txt){
   const loaded=getImgCache();
   safe=safe.replace(/(https?:\/\/\S+)/gi,(url)=>{
     const isImg=/\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(url)||/images\.unsplash\.com\/photo-/.test(url)||/picsum\.photos/.test(url);
-    const isVid=/\.(mp4|webm|mov)(\?\S*)?$/i.test(url)||/youtube\.com\/watch\?v=/.test(url)||/youtu\.be\//.test(url)||/vimeo\.com\//.test(url);
+    const yt=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+    const isMP4=/\.(mp4|webm|mov)(\?\S*)?$/i.test(url);
+    const isVimeo=url.match(/vimeo\.com\/(\d+)/);
     if(isImg){
       if(loaded[url]){btns+='<img src="'+url+'" loading="lazy" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin:8px 0" onerror="this.remove()" />';}
       else{btns+='<button class="img-load" data-img="'+url+'" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:var(--soft);color:var(--pfm-blue-2);font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center">Tap to view image</button>';}
       return'';
     }
-    if(isVid){
-      if(/youtube|youtu\.be|vimeo/.test(url)){btns+='<a href="'+url+'" target="_blank" rel="noopener" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:#fff0f0;color:#d71920;font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center;text-decoration:none">Watch video (opens in new tab)</a>';}
-      else{btns+='<button class="vid-load" data-vid="'+url+'" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:#fff0f0;color:#d71920;font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center">Tap to play video</button>';}
+    if(yt){
+      const thumb='https://img.youtube.com/vi/'+yt[1]+'/hqdefault.jpg';
+      btns+='<div class="vid-card" data-vid="'+yt[1]+'" style="position:relative;width:100%;border-radius:12px;overflow:hidden;cursor:pointer;margin:8px 0;background:#000"><img src="'+thumb+'" loading="lazy" style="width:100%;display:block;opacity:0.7" onerror="this.parentElement.remove()" /><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:52px;height:52px;border-radius:50%;background:rgba(255,0,0,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.4)"><span style="color:#fff;font-size:22px;margin-left:4px">&#9654;</span></div></div></div>';
+      return'';
+    }
+    if(isMP4){
+      btns+='<div class="vid-card" data-vid="'+url+'" style="position:relative;width:100%;border-radius:12px;overflow:hidden;cursor:pointer;margin:8px 0;background:#000;min-height:160px;display:flex;align-items:center;justify-content:center"><div style="width:52px;height:52px;border-radius:50%;background:rgba(255,0,0,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.4)"><span style="color:#fff;font-size:22px;margin-left:4px">&#9654;</span></div></div>';
+      return'';
+    }
+    if(isVimeo){
+      btns+='<div class="vid-card" data-vid="vimeo-'+isVimeo[1]+'" style="position:relative;width:100%;border-radius:12px;overflow:hidden;cursor:pointer;margin:8px 0;background:#000"><img src="https://vumbnail.com/'+isVimeo[1]+'.jpg" loading="lazy" style="width:100%;display:block;opacity:0.7" onerror="this.style.display=\'none\'" /><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:52px;52px;border-radius:50%;background:rgba(255,0,0,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.4)"><span style="color:#fff;font-size:22px;margin-left:4px">&#9654;</span></div></div></div>';
       return'';
     }
     return url;
@@ -162,7 +172,15 @@ document.addEventListener('click',async e=>{
   const r=e.target.closest('[data-read]');if(r){if(!live)return;await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'});reads.add(r.dataset.read);render();toast('Marked as read');return}
   const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
     const img=e.target.closest('.img-load');if(img){saveImgCache(img.dataset.img);const el=document.createElement('img');el.src=img.dataset.img;el.loading='lazy';el.style.cssText='width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin-top:6px';el.onerror=()=>el.remove();try{img.replaceWith(el)}catch{render()};return}
-    const vid=e.target.closest('.vid-load');if(vid){const el=document.createElement('video');el.src=vid.dataset.vid;el.controls=true;el.preload='none';el.style.cssText='width:100%;max-height:300px;border-radius:12px;display:block;margin-top:6px;background:#000';el.onerror=()=>el.remove();try{vid.replaceWith(el)}catch{render()};return}
+    const vc=e.target.closest('.vid-card');if(vc){const id=vc.dataset.vid;let el;
+    if(id.startsWith('vimeo-')){
+      el=document.createElement('iframe');el.src='https://player.vimeo.com/video/'+id.replace('vimeo-','')+'?autoplay=1';el.allow='autoplay;fullscreen';el.style.cssText='width:100%;aspect-ratio:16/9;border:0;border-radius:12px';
+    }else if(id.includes('.')){
+      el=document.createElement('video');el.src=id;el.controls=true;el.preload='none';el.playsInline=true;el.style.cssText='width:100%;max-height:360px;border-radius:12px;display:block;background:#000';
+    }else{
+      el=document.createElement('iframe');el.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0';el.allow='autoplay;fullscreen;picture-in-picture';el.style.cssText='width:100%;aspect-ratio:16/9;border:0;border-radius:12px';
+    }
+    el.onerror=()=>el.remove();try{vc.replaceWith(el)}catch{render()};return}
 });
 
 E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();toast('Unlocked');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
