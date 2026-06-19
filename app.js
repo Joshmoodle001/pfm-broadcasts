@@ -65,16 +65,15 @@ async function del(id) { await sb.from('broadcasts').update({is_active:false}).e
 
 function renderBody(txt) {
   let safe = esc(txt);
-  let imgs = '';
-  // Match: standard image extensions OR unsplash/placeholder image URLs
+  let btns = '';
   safe = safe.replace(/(https?:\/\/\S+)/gi, (url) => {
     if (/\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(url) || /images\.unsplash\.com\/photo-/.test(url) || /picsum\.photos/.test(url)) {
-      imgs += '<img src="'+url+'" loading="lazy" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin:8px 0;display:block" onerror="this.remove()" />';
+      btns += '<button class="img-load" data-img="'+url+'" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:var(--soft);color:var(--pfm-blue-2);font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center;gap:6px"><span>Tap to view image</span></button>';
       return '';
     }
     return url;
   });
-  return imgs + safe;
+  return btns + safe;
 }
 
 function renderPosts() {
@@ -149,10 +148,11 @@ async function init() {
 init();
 
 document.addEventListener('click',async e=>{
-  const s=e.target.closest('[data-screen]');if(s){switchScreen(s.dataset.screen);return}
-  const r=e.target.closest('[data-read]');if(r){if(!live)return;await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'});reads.add(r.dataset.read);render();toast('Marked as read');return}
-  const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
-});
+    const s=e.target.closest('[data-screen]');if(s){switchScreen(s.dataset.screen);return}
+    const r=e.target.closest('[data-read]');if(r){if(!live)return;await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'});reads.add(r.dataset.read);render();toast('Marked as read');return}
+    const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
+    const img=e.target.closest('.img-load');if(img&&!img.dataset.loaded){const el=document.createElement('img');el.src=img.dataset.img;el.loading='lazy';el.style.cssText='width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin-top:6px';el.onerror=()=>el.remove();img.replaceWith(el);img.dataset.loaded='1';return}
+  });
 
 E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();toast('Unlocked');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
 E.rf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.resetPasswordForEmail(E.re.value.trim());toast('Email sent');show('login')});
