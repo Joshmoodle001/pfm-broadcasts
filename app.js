@@ -63,12 +63,19 @@ async function create() {
 
 async function del(id) { await sb.from('broadcasts').update({is_active:false}).eq('id',id); await refresh(); toast('Deleted'); }
 
+function renderBody(txt) {
+  let html = esc(txt);
+  // Detect image URLs and render as images
+  html = html.replace(/(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?)/gi, '<img src="$1" loading="lazy" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin:8px 0;display:block" onerror="this.style.display=\'none\'" />');
+  return html;
+}
+
 function renderPosts() {
   const items=sorted(posts), unread=items.filter(i=>!isRead(i)).length;
   E.cnt.textContent=items.length+' post'+(items.length!==1?'s':'');
   if(unread)E.cnt.textContent+=' - '+unread+' unread';
   E.list.innerHTML=items.length ? '' : '<div class="empty"><strong>No posts yet.</strong></div>';
-  items.forEach(i=>{const c=document.createElement('article');const rd=isRead(i);c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><h3>'+esc(i.title)+'</h3><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><p>'+esc(i.body)+'</p><div class="post-meta"><span>'+dt(i.created)+'</span><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);});
+  items.forEach(i=>{const c=document.createElement('article');const rd=isRead(i);c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><h3>'+esc(i.title)+'</h3><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><p>'+renderBody(i.body)+'</p><div class="post-meta"><span>'+dt(i.created)+'</span><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);});
 }
 
 function renderRecent() {
