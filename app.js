@@ -79,23 +79,21 @@ function localSet(items) { localStorage.setItem(ITEMS,JSON.stringify(items)); br
 function hasSB() { return !!(SUPABASE_URL&&SUPABASE_KEY&&window.supabase&&typeof window.supabase.createClient==='function'); }
 
 async function initSB() {
-  if(!hasSB())return false;
-  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  sb.auth.onAuthStateChange(async(e,session)=>{
-    if(e==='PASSWORD_RECOVERY'){showNP();switchScreen('admin');return}
-    if(session?.user){
-      try{const{data}=await sb.from('admin_profiles').select('is_admin').eq('user_id',session.user.id).eq('is_admin',true).maybeSingle();sessionStorage.setItem(ADM,data?'1':'')}catch{sessionStorage.removeItem(ADM)}
-    }else sessionStorage.removeItem(ADM);
-    renderAdmin();
-  });
-  try{
-    const{data}=await sb.auth.getSession();
-    if(data?.session?.user){
-      try{const p=await sb.from('admin_profiles').select('is_admin').eq('user_id',data.session.user.id).eq('is_admin',true).maybeSingle();sessionStorage.setItem(ADM,p.data?'1':'')}catch{}
-    }
+  if(!hasSB()){status(false);return false}
+  try {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    sb.auth.onAuthStateChange(async(e,session)=>{
+      if(e==='PASSWORD_RECOVERY'){showNP();switchScreen('admin');return}
+      if(session?.user){
+        try{const{data}=await sb.from('admin_profiles').select('is_admin').eq('user_id',session.user.id).eq('is_admin',true).maybeSingle();sessionStorage.setItem(ADM,data?'1':'')}catch{}
+      }else sessionStorage.removeItem(ADM);
+      renderAdmin();
+    });
+    try{const{data}=await sb.auth.getSession();if(data?.session?.user){try{const p=await sb.from('admin_profiles').select('is_admin').eq('user_id',data.session.user.id).eq('is_admin',true).maybeSingle();sessionStorage.setItem(ADM,p.data?'1':'')}catch{}}}catch(e){}
     try{const c=await sb.from('admin_profiles').select('user_id',{count:'exact',head:true}).eq('is_admin',true);if(el.showSignup)el.showSignup.classList.toggle('hidden',(c.count||0)>0)}catch{}
-  }catch(e){console.warn(e)}
-  return true;
+    status(true);
+    return true;
+  }catch(e){console.warn(e);status(false);return false}
 }
 
 async function refresh() {
