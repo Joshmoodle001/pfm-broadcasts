@@ -6,11 +6,12 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const DEV = 'pfm_did'; let devId = localStorage.getItem(DEV) || (crypto.randomUUID ? crypto.randomUUID() : Date.now()+'');
 localStorage.setItem(DEV, devId);
 
-let sb, live, channel, posts = [], reads = new Set(), defInstall;
+let sb, live, channel, posts = [], reads = new Set(), defInstall, showRead = false;
 
 const $ = s => document.querySelector(s);
 const E = {
-  list: $('#postsList'), cnt: $('#postCount'), rec: $('#recentList'),
+  list: $('#postsList'), cnt: $('#postCount'), rec: $('#recentList'), past: $('#pastList'),
+  tabA: $('#tabActive'), tabR: $('#tabRead'),
   loginCard: $('#adminLoginCard'), center: $('#adminCenter'),
   lf: $('#adminLoginForm'), le: $('#adminEmail'), lp: $('#adminPassword'),
   rf: $('#resetPasswordForm'), re: $('#resetEmail'),
@@ -26,9 +27,13 @@ function toast(m) { E.toast.textContent=m; E.toast.classList.add('show'); clearT
 function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
 function dt(d) { return new Intl.DateTimeFormat('en-ZA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(d)); }
 function prio(p) { return {urgent:'Urgent',important:'Important',general:'General'}[p]||'General'; }
-function norm(r) { return {id:r.id,title:r.title,body:r.body||r.message,priority:r.priority||'general',created:r.created_at||r.created||new Date().toISOString(),is_active:r.isActive??r.is_active??true}; }
+function norm(r) { return {id:r.id,title:r.title,body:r.body||r.message,priority:r.priority||'general',created:r.created_at||r.created||new Date().toISOString(),expires:r.expires_at||null,is_active:r.isActive??r.is_active??true}; }
 function isRead(i) { return reads.has(i.id); }
-function sorted(a) { return [...a].filter(i=>i.is_active!==false).sort((a,b)=>{const ar=isRead(a)?1:0,br=isRead(b)?1:0; if(ar!==br)return ar-br; const ap={urgent:3,important:2,general:1}[a.priority]||0,bp={urgent:3,important:2,general:1}[b.priority]||0; if(ap!==bp)return bp-ap; return new Date(b.created)-new Date(a.created);}); }
+function sorted(a, expired) {
+  let arr = [...a].filter(i=>i.is_active!==false);
+  if (!expired) arr = arr.filter(i=>!i.expires||new Date(i.expires)>new Date());
+  return arr.sort((a,b)=>{const ar=isRead(a)?1:0,br=isRead(b)?1:0; if(ar!==br)return ar-br; const ap={urgent:3,important:2,general:1}[a.priority]||0,bp={urgent:3,important:2,general:1}[b.priority]||0; if(ap!==bp)return bp-ap; return new Date(b.created)-new Date(a.created);});
+}
 function on(on) { if(E.dot)E.dot.style.background=on?'#15803d':'#d71920'; if(E.lbl)E.lbl.textContent=on?'Connected':'Offline'; }
 
 async function refresh() {
@@ -56,7 +61,9 @@ async function login() {
 }
 
 async function create() {
-  const{error}=await sb.from('broadcasts').insert({title:E.t.value.trim(),message:E.b.value.trim(),priority:document.querySelector('input[name="priority"]:checked')?.value||'general',is_active:true});
+  const h = document.querySelector('#expiry')?.value;
+  const exp = h ? new Date(Date.now()+h*3600000).toISOString() : null;
+  const{error}=await sb.from('broadcasts').insert({title:E.t.value.trim(),message:E.b.value.trim(),priority:document.querySelector('input[name="priority"]:checked')?.value||'general',expires_at:exp,is_active:true});
   if(error) throw error;
   await refresh(); toast('Broadcast sent'); switchScreen('posts');
 }
@@ -83,18 +90,27 @@ function renderBody(txt) {
 }
 
 function renderPosts() {
-  const items=sorted(posts), unread=items.filter(i=>!isRead(i)).length;
+  const active = sorted(posts).filter(i=>!isRead(i));
+  const readItems = sorted(posts).filter(i=>isRead(i));
+  const items = showRead ? readItems : active;
   E.cnt.textContent=items.length+' post'+(items.length!==1?'s':'');
-  if(unread)E.cnt.textContent+=' - '+unread+' unread';
-  E.list.innerHTML=items.length ? '' : '<div class="empty"><strong>No posts yet.</strong></div>';
+  if(!showRead){ const unread=active.length; if(unread)E.cnt.textContent+=` - ${unread} unread`; }
+  E.list.innerHTML=items.length ? '' : '<div class="empty">'+(showRead?'No read posts yet.':'No posts yet.')+'</div>';
   items.forEach(i=>{const c=document.createElement('article');const rd=isRead(i);c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><h3>'+esc(i.title)+'</h3><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><p>'+renderBody(i.body)+'</p><div class="post-meta"><span>'+dt(i.created)+'</span><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);});
 }
 
 function renderRecent() {
   if(!E.rec)return;
-  const items=[...posts].sort((a,b)=>new Date(b.created)-new Date(a.created)).slice(0,10);
-  E.rec.innerHTML=items.length?'':'<div class="empty">No broadcasts yet.</div>';
-  items.forEach(i=>{const d=document.createElement('div');d.className='recent-item';d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>'+esc(i.title)+'</strong><br><span>'+prio(i.priority)+' - '+dt(i.created)+'</span></div><button class="btn-link" data-delete="'+esc(i.id)+'" style="color:#d71920;font-size:12px">Delete</button></div>';E.rec.appendChild(d);});
+  const items=sorted(posts).slice(0,10);
+  E.rec.innerHTML=items.length?'':'<div class="empty">No active broadcasts.</div>';
+  items.forEach(i=>{const d=document.createElement('div');d.className='recent-item';d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>'+esc(i.title)+'</strong><br><span>'+prio(i.priority)+' - '+dt(i.created)+(i.expires?' - Expires: '+dt(i.expires):'')+'</span></div><button class="btn-link" data-delete="'+esc(i.id)+'" style="color:#d71920;font-size:12px">Delete</button></div>';E.rec.appendChild(d);});
+}
+
+function renderPast() {
+  if(!E.past)return;
+  const past = posts.filter(i=>i.is_active!==false&&i.expires&&new Date(i.expires)<=new Date());
+  E.past.innerHTML=past.length?'':'<div class="empty">No expired posts.</div>';
+  past.forEach(i=>{const d=document.createElement('div');d.className='recent-item';d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>'+esc(i.title)+'</strong><br><span>Expired: '+dt(i.expires)+'</span></div><button class="btn-link" data-delete="'+esc(i.id)+'" style="color:#d71920;font-size:12px">Delete</button></div>';E.past.appendChild(d);});
 }
 
 function renderAdmin() {
@@ -103,7 +119,7 @@ function renderAdmin() {
   if(E.bs)E.bs.innerHTML=live?'<strong>Supabase connected</strong>':'<strong>Not connected</strong>';
 }
 
-function render() { renderPosts(); renderRecent(); renderAdmin(); }
+function render() { renderPosts(); renderRecent(); renderPast(); renderAdmin(); }
 
 function show(s) { E.lf.classList.add('hidden');E.rf.classList.add('hidden');E.nf.classList.add('hidden'); if(s)(s==='login'?E.lf:s==='reset'?E.rf:E.nf).classList.remove('hidden'); }
 
@@ -167,6 +183,8 @@ E.bf?.addEventListener('submit',async e=>{e.preventDefault();try{await create();
 E.sr?.addEventListener('click',()=>show('reset'));
 E.bl?.addEventListener('click',()=>show('login'));
 E.lk?.addEventListener('click',()=>{sb.auth.signOut();sessionStorage.removeItem('pfm_ad');renderAdmin();toast('Locked')});
+E.tabA?.addEventListener('click',()=>{showRead=false;E.tabA.classList.add('active');E.tabR.classList.remove('active');renderPosts()});
+E.tabR?.addEventListener('click',()=>{showRead=true;E.tabR.classList.add('active');E.tabA.classList.remove('active');renderPosts()});
 
 window.addEventListener('hashchange',()=>{const s=location.hash.replace('#','');if(document.querySelector('#screen-'+s))switchScreen(s)});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();defInstall=e});
