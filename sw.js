@@ -1,72 +1,13 @@
-const CACHE_NAME = 'pfm-broadcasts-pwa-v5';
-const APP_SHELL = [
-  './',
-  './index.html',
-  './app.js',
-  './manifest.webmanifest',
-  './assets/pfm-logo-full.png',
-  './assets/pfm-logo-lockup.png',
-  './assets/pfm-mark.png',
-  './assets/pfm-mark-wide.png',
-  './icons/icon-72.png',
-  './icons/icon-96.png',
-  './icons/icon-128.png',
-  './icons/icon-144.png',
-  './icons/icon-152.png',
-  './icons/icon-180.png',
-  './icons/icon-192.png',
-  './icons/icon-384.png',
-  './icons/icon-512.png',
-  './icons/apple-touch-icon-180.png',
-  './icons/maskable-icon-192.png',
-  './icons/maskable-icon-512.png'
-];
+const CACHE = 'pfm-v6';
+const SHELL = ['./','./index.html','./app.js','./manifest.webmanifest','./assets/pfm-logo-full.png','./assets/pfm-logo-lockup.png','./assets/pfm-mark.png','./assets/pfm-mark-wide.png','./icons/icon-72.png','./icons/icon-96.png','./icons/icon-128.png','./icons/icon-144.png','./icons/icon-152.png','./icons/icon-180.png','./icons/icon-192.png','./icons/icon-384.png','./icons/icon-512.png','./icons/apple-touch-icon-180.png','./icons/maskable-icon-192.png','./icons/maskable-icon-512.png'];
 
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-    ))
-  );
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-
-  const request = event.request;
-  const url = new URL(request.url);
-
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put('./index.html', clone));
-          return response;
-        })
-        .catch(() => caches.match('./index.html'))
-    );
-    return;
-  }
-
-  if (url.origin === self.location.origin) {
-    event.respondWith(
-      caches.match(request).then(cached => {
-        const fetchPromise = fetch(request).then(response => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-          }
-          return response;
-        }).catch(() => cached);
-        return cached || fetchPromise;
-      })
-    );
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
+self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE).map(x => caches.delete(x))))); self.clients.claim(); });
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  const u = new URL(e.request.url);
+  // Cache-first for app shell, network-first for API (stale-while-revalidate)
+  if (u.origin === self.location.origin && !u.pathname.startsWith('/rest/') && !u.pathname.startsWith('/auth/')) {
+    e.respondWith(caches.match(e.request).then(c => c || fetch(e.request).then(r => { if(r.ok){const clone=r.clone();caches.open(CACHE).then(ca => ca.put(e.request,clone))} return r; })));
   }
 });
