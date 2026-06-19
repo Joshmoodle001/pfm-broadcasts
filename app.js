@@ -80,26 +80,22 @@ function hasSB() { return !!(SUPABASE_URL&&SUPABASE_KEY&&window.supabase&&typeof
 
 async function initSB() {
   if(!hasSB())return false;
-  try {
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    sb.auth.onAuthStateChange(async(e,session)=>{
-      if(e==='PASSWORD_RECOVERY'){showNP();switchScreen('admin');return}
-      if(session?.user){
-        const{data}=await sb.from('admin_profiles').select('is_admin').eq('user_id',session.user.id).eq('is_admin',true).maybeSingle();
-        sessionStorage.setItem(ADM,data?'1':'');
-        if(!data){await sb.auth.signOut();toast('Not an approved admin')}
-      }else sessionStorage.removeItem(ADM);
-      renderAdmin();
-    });
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sb.auth.onAuthStateChange(async(e,session)=>{
+    if(e==='PASSWORD_RECOVERY'){showNP();switchScreen('admin');return}
+    if(session?.user){
+      try{const{data}=await sb.from('admin_profiles').select('is_admin').eq('user_id',session.user.id).eq('is_admin',true).maybeSingle();sessionStorage.setItem(ADM,data?'1':'')}catch{sessionStorage.removeItem(ADM)}
+    }else sessionStorage.removeItem(ADM);
+    renderAdmin();
+  });
+  try{
     const{data}=await sb.auth.getSession();
     if(data?.session?.user){
-      const p=await sb.from('admin_profiles').select('is_admin').eq('user_id',data.session.user.id).eq('is_admin',true).maybeSingle();
-      sessionStorage.setItem(ADM,p.data?'1':'');
+      try{const p=await sb.from('admin_profiles').select('is_admin').eq('user_id',data.session.user.id).eq('is_admin',true).maybeSingle();sessionStorage.setItem(ADM,p.data?'1':'')}catch{}
     }
-    // Lazy check - only hide signup after first admin exists
     try{const c=await sb.from('admin_profiles').select('user_id',{count:'exact',head:true}).eq('is_admin',true);if(el.showSignup)el.showSignup.classList.toggle('hidden',(c.count||0)>0)}catch{}
-    return true;
-  }catch(e){console.warn('SB init:',e.message);sb=null;return false}
+  }catch(e){console.warn(e)}
+  return true;
 }
 
 async function refresh() {
