@@ -95,18 +95,41 @@ function switchScreen(s) {
   history.replaceState(null,'','#'+s); scrollTo(0,0);
 }
 
-window.addEventListener('load',async()=>{
-  if(!window.supabase){on(false);return}
-  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-  try{await sb.from('broadcasts').select('id').limit(1)}catch(e){on(false);return}
-  live=true; on(true);
-  sb.auth.onAuthStateChange((e,session)=>{if(e==='PASSWORD_RECOVERY'){show('new');switchScreen('admin')}if(session?.user){sb.from('admin_profiles').select('is_admin').eq('user_id',session.user.id).eq('is_admin',true).maybeSingle().then(r=>{sessionStorage.setItem('pfm_ad',r.data?'1':'')}).catch(()=>{sessionStorage.removeItem('pfm_ad')});renderAdmin()}else{sessionStorage.removeItem('pfm_ad');renderAdmin()}});
+async function init() {
+  // Wait up to 5s for Supabase SDK to load
+  let tries = 0;
+  while (!window.supabase && tries < 50) { await new Promise(r => setTimeout(r, 100)); tries++; }
+  if (!window.supabase) { on(false); return; }
+
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // Probe connection
+  try { const { error } = await sb.from('broadcasts').select('id').limit(1); if (error) throw error; }
+  catch(e) { console.error('Supabase probe failed:', e.message); on(false); return; }
+
+  live = true; on(true);
+  if(E.bs)E.bs.innerHTML='<strong>Supabase connected</strong><span>Realtime active.</span>';
+
+  sb.auth.onAuthStateChange((e,session)=>{
+    if(e==='PASSWORD_RECOVERY'){show('new');switchScreen('admin')}
+    if(session?.user){
+      sb.from('admin_profiles').select('is_admin').eq('user_id',session.user.id).eq('is_admin',true).maybeSingle()
+        .then(r=>{sessionStorage.setItem('pfm_ad',r.data?'1':'')}).catch(()=>{sessionStorage.removeItem('pfm_ad')});
+      renderAdmin();
+    } else { sessionStorage.removeItem('pfm_ad'); renderAdmin(); }
+  });
+
   const{data:ses}=await sb.auth.getSession();
-  if(ses?.session?.user){sb.from('admin_profiles').select('is_admin').eq('user_id',ses.session.user.id).eq('is_admin',true).maybeSingle().then(r=>{sessionStorage.setItem('pfm_ad',r.data?'1':'')})}
+  if(ses?.session?.user){
+    sb.from('admin_profiles').select('is_admin').eq('user_id',ses.session.user.id).eq('is_admin',true).maybeSingle()
+      .then(r=>{sessionStorage.setItem('pfm_ad',r.data?'1':'')});
+  }
+
   await refresh(); sub();
-  const s=(location.hash||'#welcome').replace('#','');if(E['screen-'+s])switchScreen(s);
-  if(E.bs)E.bs.innerHTML='<strong>Supabase connected</strong><span>Realtime sync active.</span>';
-});
+  const s=(location.hash||'#welcome').replace('#',''); if(document.querySelector('#screen-'+s)) switchScreen(s);
+}
+
+init();
 
 document.addEventListener('click',async e=>{
   const s=e.target.closest('[data-screen]');if(s){switchScreen(s.dataset.screen);return}
