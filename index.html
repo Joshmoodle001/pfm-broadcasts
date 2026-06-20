@@ -591,6 +591,54 @@
       color: var(--pfm-green);
     }
 
+    .update-banner {
+      position: fixed;
+      z-index: 90;
+      left: 50%;
+      top: calc(12px + var(--safe-top));
+      transform: translate(-50%, -16px);
+      width: min(560px, calc(100% - 28px));
+      padding: 14px;
+      border: 1px solid rgba(7,57,143,.16);
+      border-radius: 22px;
+      background: rgba(255,255,255,.95);
+      box-shadow: 0 20px 48px rgba(0,28,82,.18);
+      backdrop-filter: blur(18px);
+      display: grid;
+      gap: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .update-banner.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+
+    .update-banner strong {
+      color: var(--pfm-blue);
+      font-size: 14px;
+    }
+
+    .update-banner p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .update-banner-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    .update-banner-actions .btn-secondary {
+      min-height: 44px;
+    }
+
     .tag {
       flex: 0 0 auto;
       display: inline-flex;
@@ -1114,6 +1162,17 @@
     <button class="nav-btn active" type="button" data-screen="welcome">Welcome</button>
     <button class="nav-btn" type="button" data-screen="posts">Posts</button>
   </nav>
+
+  <div class="update-banner" id="updateBanner" role="status" aria-live="polite">
+    <div>
+      <strong>App update available</strong>
+      <p id="updateBannerText">A newer version of PFM Broadcasts is ready. Refresh to load the latest admin tools and fixes.</p>
+    </div>
+    <div class="update-banner-actions">
+      <button type="button" id="refreshAppBtn">Refresh now</button>
+      <button class="btn-secondary" type="button" id="dismissUpdateBtn">Later</button>
+    </div>
+  </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

@@ -20,6 +20,8 @@ let defInstall;
 let showRead = false;
 let imgCache = null;
 let submitBusy = false;
+let swRegistration;
+let reloadPending = false;
 
 const $ = selector => document.querySelector(selector);
 const E = {
@@ -59,6 +61,10 @@ const E = {
   is: $('#installSteps'),
   bs: $('#backendStatus'),
   toast: $('#toast'),
+  ub: $('#updateBanner'),
+  ubt: $('#updateBannerText'),
+  ubr: $('#refreshAppBtn'),
+  ubd: $('#dismissUpdateBtn'),
   dot: $('#statusDot'),
   lbl: $('#statusLabel'),
   bSubmit: $('#broadcastForm button[type="submit"]'),
@@ -70,6 +76,15 @@ function toast(message) {
   E.toast.classList.add('show');
   clearTimeout(toast.t);
   toast.t = setTimeout(() => E.toast.classList.remove('show'), 2500);
+}
+
+function showUpdateBanner(message) {
+  if (E.ubt && message) E.ubt.textContent = message;
+  E.ub?.classList.add('show');
+}
+
+function hideUpdateBanner() {
+  E.ub?.classList.remove('show');
 }
 
 function esc(value) {
@@ -611,6 +626,27 @@ function renderAdmin() {
   E.demoOnly.forEach(node => node.classList.toggle('hidden', live));
 }
 
+function watchServiceWorker(registration) {
+  if (!registration) return;
+  swRegistration = registration;
+
+  if (registration.waiting) {
+    showUpdateBanner('A newer version of PFM Broadcasts is ready. Refresh to load the latest admin tools and fixes.');
+  }
+
+  registration.addEventListener('updatefound', () => {
+    const worker = registration.installing;
+    if (!worker) return;
+    worker.addEventListener('statechange', () => {
+      if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+        showUpdateBanner('A newer version of PFM Broadcasts has been downloaded. Refresh to use the latest version.');
+      }
+    });
+  });
+
+  setTimeout(() => registration.update().catch(() => {}), 3000);
+}
+
 function render() {
   renderPosts();
   renderRecent();
@@ -887,6 +923,14 @@ E.mf?.addEventListener('change', () => {
     setMediaStatus(error.message || 'That file could not be used.', 'error');
   }
 });
+E.ubr?.addEventListener('click', () => {
+  hideUpdateBanner();
+  if (swRegistration?.waiting) {
+    swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  }
+  location.reload();
+});
+E.ubd?.addEventListener('click', () => hideUpdateBanner());
 
 E.sr?.addEventListener('click', () => show('reset'));
 E.ss?.addEventListener('click', () => show('signup'));
@@ -955,4 +999,12 @@ E.iw?.addEventListener('click', async () => {
   renderInstallSteps();
 });
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadPending) return;
+    reloadPending = true;
+    showUpdateBanner('PFM Broadcasts has been updated. Refresh now to load the newest version.');
+  });
+
+  navigator.serviceWorker.register('./sw.js').then(watchServiceWorker).catch(() => {});
+}
