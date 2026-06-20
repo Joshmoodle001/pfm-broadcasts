@@ -22,6 +22,7 @@ let imgCache = null;
 let submitBusy = false;
 let swRegistration;
 let reloadPending = false;
+let deletingIds = new Set();
 
 const $ = selector => document.querySelector(selector);
 const E = {
@@ -535,9 +536,25 @@ async function create() {
 }
 
 async function del(id) {
-  await sb.from('broadcasts').update({ is_active: false }).eq('id', id);
-  await refresh();
-  toast('Deleted');
+  if (deletingIds.has(id)) return;
+
+  const previousPosts = posts.map(item => ({ ...item }));
+  deletingIds.add(id);
+  posts = posts.map(item => (item.id === id ? { ...item, is_active: false } : item));
+  render();
+
+  try {
+    const { error } = await sb.from('broadcasts').update({ is_active: false }).eq('id', id);
+    if (error) throw error;
+    toast('Deleted');
+    await refresh();
+  } catch (error) {
+    posts = previousPosts;
+    render();
+    throw error;
+  } finally {
+    deletingIds.delete(id);
+  }
 }
 
 function renderPosts() {
@@ -815,7 +832,13 @@ document.addEventListener('click', async event => {
 
   const deleteButton = event.target.closest('[data-delete]');
   if (deleteButton) {
-    if (confirm('Delete this broadcast?')) await del(deleteButton.dataset.delete);
+    if (confirm('Delete this broadcast?')) {
+      try {
+        await del(deleteButton.dataset.delete);
+      } catch (error) {
+        toast(error.message || 'Could not delete broadcast');
+      }
+    }
     return;
   }
 
