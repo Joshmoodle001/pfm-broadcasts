@@ -1101,12 +1101,19 @@
                 </label>
                 <div class="upload-card">
                   <label>
-                    Upload image or video (optional)
-                    <input id="broadcastMediaFile" name="mediaFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" />
+                    Upload image (optional)
+                    <input id="broadcastImageFile" name="imageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
                   </label>
-                  <div class="upload-status" id="broadcastMediaStatus" aria-live="polite"></div>
+                  <div class="upload-status" id="broadcastImageStatus" aria-live="polite"></div>
                 </div>
-                <p class="field-hint">Paste a link, upload a file, or use both. Uploaded media is stored in Supabase Storage and added to the post as a lazy-loaded preview. Images and videos are limited to 50 MB each.</p>
+                <div class="upload-card">
+                  <label>
+                    Upload video (optional)
+                    <input id="broadcastVideoFile" name="videoFile" type="file" accept="video/mp4,video/webm,video/quicktime" />
+                  </label>
+                  <div class="upload-status" id="broadcastVideoStatus" aria-live="polite"></div>
+                </div>
+                <p class="field-hint">Paste a link, upload an image, upload a video, or combine them. Uploaded media is stored in Supabase Storage and added to the post as lazy-loaded previews. Images and videos are limited to 50 MB each.</p>
                 <label>
                   Priority
                   <div class="priority-row" role="radiogroup" aria-label="Broadcast priority">

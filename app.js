@@ -51,8 +51,10 @@ const E = {
   t: $('#title'),
   b: $('#body'),
   mu: $('#broadcastMediaUrl'),
-  mf: $('#broadcastMediaFile'),
-  ms: $('#broadcastMediaStatus'),
+  ifi: $('#broadcastImageFile'),
+  ifs: $('#broadcastImageStatus'),
+  vfi: $('#broadcastVideoFile'),
+  vfs: $('#broadcastVideoStatus'),
   sbSeed: $('#seedBtn'),
   sbClear: $('#clearBtn'),
   lk: $('#lockAdminBtn'),
@@ -166,11 +168,26 @@ function formatBytes(bytes) {
   return `${value >= 10 || power === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[power]}`;
 }
 
+function setFileStatus(element, message, tone) {
+  if (!element) return;
+  element.textContent = message || '';
+  element.classList.remove('error', 'success');
+  if (tone) element.classList.add(tone);
+}
+
 function setMediaStatus(message, tone) {
-  if (!E.ms) return;
-  E.ms.textContent = message || '';
-  E.ms.classList.remove('error', 'success');
-  if (tone) E.ms.classList.add(tone);
+  setFileStatus(E.ifs, message, tone);
+  setFileStatus(E.vfs, message, tone);
+}
+
+function setSingleMediaStatus(kind, message, tone) {
+  const map = { image: E.ifs, video: E.vfs };
+  setFileStatus(map[kind], message, tone);
+}
+
+function clearMediaStatuses() {
+  setFileStatus(E.ifs, '');
+  setFileStatus(E.vfs, '');
 }
 
 function updateSubmitState(busy, label) {
@@ -188,22 +205,45 @@ function sanitizeFileSegment(value) {
     .slice(0, 80) || 'media';
 }
 
-function getSelectedMediaFile() {
-  return E.mf?.files?.[0] || null;
+function getSelectedImageFile() {
+  return E.ifi?.files?.[0] || null;
+}
+
+function getSelectedVideoFile() {
+  return E.vfi?.files?.[0] || null;
+}
+
+function getSelectedMediaFiles() {
+  return [
+    { kind: 'image', file: getSelectedImageFile() },
+    { kind: 'video', file: getSelectedVideoFile() }
+  ].filter(entry => entry.file);
+}
+
+function hasSelectedUploads() {
+  return getSelectedMediaFiles().length > 0;
 }
 
 function updateMediaSelectionState() {
-  const file = getSelectedMediaFile();
-  if (!file) {
-    setMediaStatus('');
-    return;
-  }
-  setMediaStatus(`${file.name} selected (${formatBytes(file.size)})`);
+  const image = getSelectedImageFile();
+  const video = getSelectedVideoFile();
+  if (image) setSingleMediaStatus('image', `${image.name} selected (${formatBytes(image.size)})`);
+  else setSingleMediaStatus('image', '');
+  if (video) setSingleMediaStatus('video', `${video.name} selected (${formatBytes(video.size)})`);
+  else setSingleMediaStatus('video', '');
 }
 
-function validateMediaFile(file) {
+function validateMediaFile(file, kind) {
   if (!file) return;
-  if (!(file.type.startsWith('image/') || file.type.startsWith('video/'))) {
+  const isImage = file.type.startsWith('image/');
+  const isVideo = file.type.startsWith('video/');
+  if (kind === 'image' && !isImage) {
+    throw new Error('Only image files are allowed in the image upload field');
+  }
+  if (kind === 'video' && !isVideo) {
+    throw new Error('Only video files are allowed in the video upload field');
+  }
+  if (!(isImage || isVideo)) {
     throw new Error('Only image and video uploads are supported');
   }
   if (file.size > MAX_MEDIA_BYTES) {
@@ -226,8 +266,8 @@ async function getAdminAccessToken() {
   return token;
 }
 
-async function uploadMediaFile(file) {
-  validateMediaFile(file);
+async function uploadMediaFile(file, kind) {
+  validateMediaFile(file, kind);
   const authToken = await getAdminAccessToken();
 
   const signResponse = await fetch('./api/media-upload', {
@@ -467,15 +507,15 @@ async function login() {
 async function create() {
   const hours = document.querySelector('#expiry')?.value;
   const mediaUrl = E.mu?.value.trim();
-  const mediaFile = getSelectedMediaFile();
+  const mediaFiles = getSelectedMediaFiles();
   const expires = hours ? new Date(Date.now() + Number(hours) * 3600000).toISOString() : null;
   const mediaUrls = [];
 
   if (mediaUrl) mediaUrls.push(mediaUrl);
-  if (mediaFile) {
-    setMediaStatus(`Uploading ${mediaFile.name}...`);
-    mediaUrls.push(await uploadMediaFile(mediaFile));
-    setMediaStatus(`${mediaFile.name} uploaded successfully.`, 'success');
+  for (const entry of mediaFiles) {
+    setSingleMediaStatus(entry.kind, `Uploading ${entry.file.name}...`);
+    mediaUrls.push(await uploadMediaFile(entry.file, entry.kind));
+    setSingleMediaStatus(entry.kind, `${entry.file.name} uploaded successfully.`, 'success');
   }
 
   const message = getMessageWithMedia(E.b.value, mediaUrls);
@@ -899,11 +939,11 @@ E.nf?.addEventListener('submit', async event => {
 E.bf?.addEventListener('submit', async event => {
   event.preventDefault();
   try {
-    updateSubmitState(true, getSelectedMediaFile() ? 'Uploading media...' : 'Sending Broadcast');
+    updateSubmitState(true, hasSelectedUploads() ? 'Uploading media...' : 'Sending Broadcast');
     await create();
     E.bf.reset();
     E.bf.querySelector('input[name="priority"][value="important"]').checked = true;
-    setMediaStatus('');
+    clearMediaStatuses();
     updateMediaSelectionState();
   } catch (error) {
     toast(error.message || 'Could not send broadcast');
@@ -913,14 +953,24 @@ E.bf?.addEventListener('submit', async event => {
   }
 });
 
-E.mf?.addEventListener('change', () => {
+E.ifi?.addEventListener('change', () => {
   try {
-    const file = getSelectedMediaFile();
-    if (file) validateMediaFile(file);
+    const file = getSelectedImageFile();
+    if (file) validateMediaFile(file, 'image');
     updateMediaSelectionState();
   } catch (error) {
-    if (E.mf) E.mf.value = '';
-    setMediaStatus(error.message || 'That file could not be used.', 'error');
+    if (E.ifi) E.ifi.value = '';
+    setSingleMediaStatus('image', error.message || 'That image could not be used.', 'error');
+  }
+});
+E.vfi?.addEventListener('change', () => {
+  try {
+    const file = getSelectedVideoFile();
+    if (file) validateMediaFile(file, 'video');
+    updateMediaSelectionState();
+  } catch (error) {
+    if (E.vfi) E.vfi.value = '';
+    setSingleMediaStatus('video', error.message || 'That video could not be used.', 'error');
   }
 });
 E.ubr?.addEventListener('click', () => {
