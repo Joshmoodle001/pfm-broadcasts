@@ -267,6 +267,21 @@ async function getAdminAccessToken() {
   return token;
 }
 
+async function adminDeleteRequest(payload) {
+  const authToken = await getAdminAccessToken();
+  const response = await fetch('./api/admin-posts', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${authToken}`
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Admin delete failed');
+  return data;
+}
+
 async function uploadMediaFile(file, kind) {
   validateMediaFile(file, kind);
   const authToken = await getAdminAccessToken();
@@ -544,8 +559,7 @@ async function del(id) {
   render();
 
   try {
-    const { error } = await sb.from('broadcasts').update({ is_active: false }).eq('id', id);
-    if (error) throw error;
+    await adminDeleteRequest({ id });
     toast('Deleted');
     await refresh();
   } catch (error) {
