@@ -5,201 +5,818 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const DEV = 'pfm_did';
 let devId = localStorage.getItem(DEV);
-if(!devId){devId=crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2);localStorage.setItem(DEV,devId);}
+if (!devId) {
+  devId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(DEV, devId);
+}
 
-let sb, live, channel, posts=[], reads=new Set(), defInstall, showRead=false, imgCache=null;
+let sb;
+let live = false;
+let channel;
+let posts = [];
+let reads = new Set();
+let defInstall;
+let showRead = false;
+let imgCache = null;
 
-const $=s=>document.querySelector(s);
-const E={
-  list:$('#postsList'),cnt:$('#postCount'),rec:$('#recentList'),past:$('#pastList'),
-  tabA:$('#tabActive'),tabR:$('#tabRead'),
-  loginCard:$('#adminLoginCard'),center:$('#adminCenter'),
-  lf:$('#adminLoginForm'),le:$('#adminEmail'),lp:$('#adminPassword'),
-  rf:$('#resetPasswordForm'),re:$('#resetEmail'),
-  nf:$('#newPasswordForm'),np:$('#newPassword'),
-  sr:$('#showResetBtn'),bl:$('#backToLoginBtn'),
-  bf:$('#broadcastForm'),t:$('#title'),b:$('#body'),
-  sbSeed:$('#seedBtn'),sbClear:$('#clearBtn'),lk:$('#lockAdminBtn'),
-  ib:$('#installBtn'),iw:$('#installFromWelcomeBtn'),is:$('#installSteps'),
-  bs:$('#backendStatus'),toast:$('#toast'),dot:$('#statusDot'),lbl:$('#statusLabel')
+const $ = selector => document.querySelector(selector);
+const E = {
+  list: $('#postsList'),
+  cnt: $('#postCount'),
+  rec: $('#recentList'),
+  past: $('#pastList'),
+  tabA: $('#tabActive'),
+  tabR: $('#tabRead'),
+  loginCard: $('#adminLoginCard'),
+  center: $('#adminCenter'),
+  lf: $('#adminLoginForm'),
+  le: $('#adminEmail'),
+  lp: $('#adminPassword'),
+  sf: $('#signupForm'),
+  se: $('#signupEmail'),
+  sp: $('#signupPassword'),
+  ss: $('#showSignupBtn'),
+  bsl: $('#backToLoginFromSignup'),
+  rf: $('#resetPasswordForm'),
+  re: $('#resetEmail'),
+  nf: $('#newPasswordForm'),
+  np: $('#newPassword'),
+  sr: $('#showResetBtn'),
+  bl: $('#backToLoginBtn'),
+  bf: $('#broadcastForm'),
+  t: $('#title'),
+  b: $('#body'),
+  mu: $('#broadcastMediaUrl'),
+  sbSeed: $('#seedBtn'),
+  sbClear: $('#clearBtn'),
+  lk: $('#lockAdminBtn'),
+  ib: $('#installBtn'),
+  iw: $('#installFromWelcomeBtn'),
+  is: $('#installSteps'),
+  bs: $('#backendStatus'),
+  toast: $('#toast'),
+  dot: $('#statusDot'),
+  lbl: $('#statusLabel'),
+  demoOnly: [...document.querySelectorAll('[data-demo-only]')]
 };
 
-function toast(m){E.toast.textContent=m;E.toast.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>E.toast.classList.remove('show'),2500);}
-function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
-function dt(d){return new Intl.DateTimeFormat('en-ZA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(d));}
-function prio(p){return{urgent:'Urgent',important:'Important',general:'General'}[p]||'General';}
-function norm(r){return{id:r.id,title:r.title,body:r.body||r.message,priority:r.priority||'general',created:r.created_at||r.created||new Date().toISOString(),expires:r.expires_at||null,is_active:r.isActive??r.is_active??true};}
-function isRead(i){return reads.has(i.id);}
-function sorted(a,expired){
-  let arr=[...a].filter(i=>i.is_active!==false);
-  if(!expired)arr=arr.filter(i=>!i.expires||new Date(i.expires)>new Date());
-  return arr.sort((a,b)=>{const ar=isRead(a)?1:0,br=isRead(b)?1:0;if(ar!==br)return ar-br;const ap={urgent:3,important:2,general:1}[a.priority]||0,bp={urgent:3,important:2,general:1}[b.priority]||0;if(ap!==bp)return bp-ap;return new Date(b.created)-new Date(a.created);});
+function toast(message) {
+  E.toast.textContent = message;
+  E.toast.classList.add('show');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => E.toast.classList.remove('show'), 2500);
 }
-function on(v){if(E.dot)E.dot.style.background=v?'#15803d':'#d71920';if(E.lbl)E.lbl.textContent=v?'Connected':'Offline';}
 
-function getImgCache(){if(!imgCache)imgCache=JSON.parse(localStorage.getItem('pfm_imgs')||'{}');return imgCache;}
-function saveImgCache(url){const c=getImgCache();c[url]=1;localStorage.setItem('pfm_imgs',JSON.stringify(c));imgCache=c;}
+function esc(value) {
+  const div = document.createElement('div');
+  div.textContent = value || '';
+  return div.innerHTML;
+}
 
-async function refresh(){
-  try{
-    const[a,b]=await Promise.all([
-      sb.from('broadcasts').select('id,title,message,priority,created_at,expires_at,is_active').eq('is_active',true).order('created_at',{ascending:false}).limit(200),
-      sb.from('broadcast_reads').select('broadcast_id').eq('device_id',devId)
+function escAttr(value) {
+  return esc(value).replace(/"/g, '&quot;');
+}
+
+function dt(value) {
+  return new Intl.DateTimeFormat('en-ZA', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value));
+}
+
+function prio(value) {
+  return { urgent: 'Urgent', important: 'Important', general: 'General' }[value] || 'General';
+}
+
+function norm(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body || row.message,
+    priority: row.priority || 'general',
+    created: row.created_at || row.created || new Date().toISOString(),
+    expires: row.expires_at || null,
+    is_active: row.isActive ?? row.is_active ?? true
+  };
+}
+
+function isRead(item) {
+  return reads.has(item.id);
+}
+
+function sorted(items, expired) {
+  let out = [...items].filter(item => item.is_active !== false);
+  if (!expired) out = out.filter(item => !item.expires || new Date(item.expires) > new Date());
+  return out.sort((a, b) => {
+    const aRead = isRead(a) ? 1 : 0;
+    const bRead = isRead(b) ? 1 : 0;
+    if (aRead !== bRead) return aRead - bRead;
+    const aPriority = { urgent: 3, important: 2, general: 1 }[a.priority] || 0;
+    const bPriority = { urgent: 3, important: 2, general: 1 }[b.priority] || 0;
+    if (aPriority !== bPriority) return bPriority - aPriority;
+    return new Date(b.created) - new Date(a.created);
+  });
+}
+
+function on(connected) {
+  if (E.dot) E.dot.style.background = connected ? '#15803d' : '#d71920';
+  if (E.lbl) E.lbl.textContent = connected ? 'Connected' : 'Offline';
+}
+
+function getImgCache() {
+  if (!imgCache) imgCache = JSON.parse(localStorage.getItem('pfm_imgs') || '{}');
+  return imgCache;
+}
+
+function saveImgCache(url) {
+  const cache = getImgCache();
+  cache[url] = 1;
+  localStorage.setItem('pfm_imgs', JSON.stringify(cache));
+  imgCache = cache;
+}
+
+function shortenUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const compact = `${parsed.hostname.replace(/^www\./i, '')}${parsed.pathname}${parsed.search}`;
+    return compact.length > 62 ? `${compact.slice(0, 59)}...` : compact;
+  } catch {
+    return url.length > 62 ? `${url.slice(0, 59)}...` : url;
+  }
+}
+
+function splitTrailing(raw) {
+  let url = raw;
+  let trailing = '';
+
+  while (url) {
+    const last = url.slice(-1);
+    if (/[.,!?]/.test(last)) {
+      trailing = last + trailing;
+      url = url.slice(0, -1);
+      continue;
+    }
+    if (last === ')' || last === ']' || last === '}') {
+      const open = { ')': '(', ']': '[', '}': '{' }[last];
+      const opens = (url.match(new RegExp(`\\${open}`, 'g')) || []).length;
+      const closes = (url.match(new RegExp(`\\${last}`, 'g')) || []).length;
+      if (closes > opens) {
+        trailing = last + trailing;
+        url = url.slice(0, -1);
+        continue;
+      }
+    }
+    break;
+  }
+
+  return { url, trailing };
+}
+
+function getYouTubeId(parsed) {
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  if (host === 'youtu.be') {
+    return parsed.pathname.split('/').filter(Boolean)[0] || '';
+  }
+  if (!host.endsWith('youtube.com')) return '';
+  if (parsed.searchParams.get('v')) return parsed.searchParams.get('v') || '';
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'embed' || parts[0] === 'shorts' || parts[0] === 'live') return parts[1] || '';
+  return '';
+}
+
+function getVimeoId(parsed) {
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  if (!host.endsWith('vimeo.com')) return '';
+  return parsed.pathname.split('/').filter(Boolean).find(part => /^\d+$/.test(part)) || '';
+}
+
+function classifyUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    const path = parsed.pathname.toLowerCase();
+    const ext = (path.match(/\.([a-z0-9]+)$/i) || [])[1] || '';
+
+    if (
+      ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif'].includes(ext) ||
+      host === 'images.unsplash.com' ||
+      host === 'picsum.photos'
+    ) {
+      return { type: 'image', url, badge: host === 'images.unsplash.com' ? 'Unsplash' : 'Image' };
+    }
+
+    const ytId = getYouTubeId(parsed);
+    if (ytId) return { type: 'youtube', url, id: ytId, badge: 'YouTube' };
+
+    const vimeoId = getVimeoId(parsed);
+    if (vimeoId) return { type: 'vimeo', url, id: vimeoId, badge: 'Vimeo' };
+
+    if (['mp4', 'webm', 'mov', 'm4v', 'ogg'].includes(ext)) {
+      return { type: 'video', url, badge: 'Video file' };
+    }
+  } catch {
+    return { type: 'link', url, badge: 'Link' };
+  }
+
+  return { type: 'link', url, badge: 'Link' };
+}
+
+function renderLink(url, text) {
+  const label = text || shortenUrl(url);
+  return `<a class="inline-link" href="${escAttr(url)}" target="_blank" rel="noopener">${esc(label)}</a>`;
+}
+
+function renderImage(url, loaded) {
+  if (loaded) {
+    return `
+      <div class="media-block">
+        <div class="media-preview">
+          <img src="${escAttr(url)}" loading="lazy" alt="Broadcast image preview" onerror="this.closest('.media-block').remove()" />
+        </div>
+        ${renderLink(url)}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="media-block">
+      <button class="media-launch img-load" type="button" data-img="${escAttr(url)}">
+        <span class="media-chip">Image</span>
+        <strong>Tap to view image</strong>
+        <span>Loads only when you choose it.</span>
+      </button>
+      ${renderLink(url)}
+    </div>
+  `;
+}
+
+function renderVideo(meta) {
+  const action = meta.type === 'video' ? 'Tap to play video' : 'Tap to open player';
+  return `
+    <div class="media-block">
+      <button class="media-launch vid-card" type="button" data-kind="${escAttr(meta.type)}" data-src="${escAttr(meta.url)}" data-id="${escAttr(meta.id || '')}">
+        <span class="media-chip">${esc(meta.badge)}</span>
+        <strong>${action}</strong>
+        <span>Stays unloaded until you open it in this post.</span>
+      </button>
+      ${renderLink(meta.url)}
+    </div>
+  `;
+}
+
+function renderBody(text) {
+  const source = String(text || '');
+  const loaded = getImgCache();
+  const urlRegex = /https?:\/\/\S+/gi;
+  let out = '';
+  let lastIndex = 0;
+  let match;
+
+  while ((match = urlRegex.exec(source))) {
+    out += esc(source.slice(lastIndex, match.index));
+    const token = splitTrailing(match[0]);
+    const meta = classifyUrl(token.url);
+
+    if (meta.type === 'image') out += renderImage(meta.url, loaded[meta.url]);
+    else if (meta.type === 'video' || meta.type === 'youtube' || meta.type === 'vimeo') out += renderVideo(meta);
+    else out += renderLink(meta.url);
+
+    out += esc(token.trailing);
+    lastIndex = match.index + match[0].length;
+  }
+
+  out += esc(source.slice(lastIndex));
+  return out;
+}
+
+async function refresh() {
+  try {
+    const [postQuery, readQuery] = await Promise.all([
+      sb.from('broadcasts')
+        .select('id,title,message,priority,created_at,expires_at,is_active')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(200),
+      sb.from('broadcast_reads').select('broadcast_id').eq('device_id', devId)
     ]);
-    if(!a.error)posts=(a.data||[]).map(norm);
-    if(!b.error)reads=new Set((b.data||[]).map(r=>r.broadcast_id));
+
+    if (!postQuery.error) posts = (postQuery.data || []).map(norm);
+    if (!readQuery.error) reads = new Set((readQuery.data || []).map(row => row.broadcast_id));
     render();
-  }catch(e){console.error(e)}
+  } catch (error) {
+    console.error(error);
+  }
 }
 
-function sub(){if(!sb||channel)return;channel=sb.channel('p').on('postgres_changes',{event:'*',schema:'public',table:'broadcasts'},refresh).on('postgres_changes',{event:'*',schema:'public',table:'broadcast_reads'},refresh).subscribe();}
-
-function admin(){return live&&sessionStorage.getItem('pfm_ad')==='1';}
-
-async function login(){
-  const{data,error}=await sb.auth.signInWithPassword({email:E.le.value.trim(),password:E.lp.value});
-  if(error)throw error;
-  const{data:prof}=await sb.from('admin_profiles').select('is_admin').eq('user_id',data.user.id).eq('is_admin',true).maybeSingle();
-  if(!prof)throw new Error('Not an approved admin');
-  sessionStorage.setItem('pfm_ad','1');
+function sub() {
+  if (!sb || channel) return;
+  channel = sb.channel('p')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'broadcasts' }, refresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'broadcast_reads' }, refresh)
+    .subscribe();
 }
 
-async function create(){
-  const h=document.querySelector('#expiry')?.value;
-  const exp=h?new Date(Date.now()+h*3600000).toISOString():null;
-  const{error}=await sb.from('broadcasts').insert({title:E.t.value.trim(),message:E.b.value.trim(),priority:document.querySelector('input[name="priority"]:checked')?.value||'general',expires_at:exp,is_active:true});
-  if(error)throw error;
-  await refresh();toast('Broadcast sent');switchScreen('posts');
+function admin() {
+  return live && sessionStorage.getItem('pfm_ad') === '1';
 }
 
-async function del(id){await sb.from('broadcasts').update({is_active:false}).eq('id',id);await refresh();toast('Deleted');}
-
-function renderBody(txt){
-  let safe=esc(txt),btns='';
-  const loaded=getImgCache();
-  safe=safe.replace(/(https?:\/\/\S+)/gi,(url)=>{
-    const isImg=/\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(url)||/images\.unsplash\.com\/photo-/.test(url)||/picsum\.photos/.test(url);
-    const yt=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-    const isMP4=/\.(mp4|webm|mov)(\?\S*)?$/i.test(url);
-    const isVimeo=url.match(/vimeo\.com\/(\d+)/);
-    if(isImg){
-      if(loaded[url]){btns+='<img src="'+url+'" loading="lazy" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin:8px 0" onerror="this.remove()" />';}
-      else{btns+='<button class="img-load" data-img="'+url+'" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:var(--soft);color:var(--pfm-blue-2);font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center">Tap to view image</button>';}
-      return'';
-    }
-    if(yt){
-      const thumb='https://img.youtube.com/vi/'+yt[1]+'/hqdefault.jpg';
-      btns+='<div class="vid-card" data-vid="'+yt[1]+'" style="position:relative;width:100%;border-radius:12px;overflow:hidden;cursor:pointer;margin:8px 0;background:#000"><img src="'+thumb+'" loading="lazy" style="width:100%;display:block;opacity:0.7" onerror="this.parentElement.remove()" /><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:52px;height:52px;border-radius:50%;background:rgba(255,0,0,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.4)"><span style="color:#fff;font-size:22px;margin-left:4px">&#9654;</span></div></div></div>';
-      return'';
-    }
-    if(isMP4){
-      btns+='<div class="vid-card" data-vid="'+url+'" style="position:relative;width:100%;border-radius:12px;overflow:hidden;cursor:pointer;margin:8px 0;background:#000;min-height:160px;display:flex;align-items:center;justify-content:center"><div style="width:52px;height:52px;border-radius:50%;background:rgba(255,0,0,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.4)"><span style="color:#fff;font-size:22px;margin-left:4px">&#9654;</span></div></div>';
-      return'';
-    }
-    if(isVimeo){
-      btns+='<div class="vid-card" data-vid="vimeo-'+isVimeo[1]+'" style="position:relative;width:100%;border-radius:12px;overflow:hidden;cursor:pointer;margin:8px 0;background:#000"><img src="https://vumbnail.com/'+isVimeo[1]+'.jpg" loading="lazy" style="width:100%;display:block;opacity:0.7" onerror="this.style.display=\'none\'" /><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:52px;52px;border-radius:50%;background:rgba(255,0,0,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.4)"><span style="color:#fff;font-size:22px;margin-left:4px">&#9654;</span></div></div></div>';
-      return'';
-    }
-    // All other URLs become clickable links
-    const short=url.length>50?url.slice(0,47)+'...':url;
-    return '<a href="'+url+'" target="_blank" rel="noopener" style="color:var(--pfm-blue-2);text-decoration:underline;word-break:break-all">'+short+'</a>';
+async function login() {
+  const { data, error } = await sb.auth.signInWithPassword({
+    email: E.le.value.trim(),
+    password: E.lp.value
   });
-  return btns+safe;
+  if (error) throw error;
+
+  const { data: profile } = await sb.from('admin_profiles')
+    .select('is_admin')
+    .eq('user_id', data.user.id)
+    .eq('is_admin', true)
+    .maybeSingle();
+
+  if (!profile) throw new Error('Not an approved admin');
+  sessionStorage.setItem('pfm_ad', '1');
 }
 
-function renderPosts(){
-  const active=sorted(posts).filter(i=>!isRead(i));
-  const readItems=sorted(posts).filter(i=>isRead(i));
-  const items=showRead?readItems:active;
-  E.cnt.textContent=items.length+' post'+(items.length!==1?'s':'');
-  if(!showRead){const u=active.length;if(u)E.cnt.textContent+=' - '+u+' unread';}
-  E.list.innerHTML=items.length?'':'<div class="empty">'+(showRead?'No read posts yet.':'No posts yet.')+'</div>';
-  items.forEach(i=>{const c=document.createElement('article');const rd=isRead(i);c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><h3>'+esc(i.title)+'</h3><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><div style="margin:0;color:#344054;line-height:1.52;white-space:pre-wrap">'+renderBody(i.body)+'</div><div class="post-meta"><span>'+dt(i.created)+'</span><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);});
-}
+async function create() {
+  const hours = document.querySelector('#expiry')?.value;
+  const mediaUrl = E.mu?.value.trim();
+  const expires = hours ? new Date(Date.now() + Number(hours) * 3600000).toISOString() : null;
+  const message = mediaUrl ? `${E.b.value.trim()}\n\n${mediaUrl}` : E.b.value.trim();
 
-function renderRecent(){
-  if(!E.rec)return;const items=sorted(posts).slice(0,10);
-  E.rec.innerHTML=items.length?'':'<div class="empty">No active broadcasts.</div>';
-  items.forEach(i=>{const d=document.createElement('div');d.className='recent-item';d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>'+esc(i.title)+'</strong><br><span>'+prio(i.priority)+' - '+dt(i.created)+(i.expires?' - Expires: '+dt(i.expires):'')+'</span></div><button class="btn-link" data-delete="'+esc(i.id)+'" style="color:#d71920;font-size:12px">Delete</button></div>';E.rec.appendChild(d);});
-}
-
-function renderPast(){
-  if(!E.past)return;const past=posts.filter(i=>i.is_active!==false&&i.expires&&new Date(i.expires)<=new Date());
-  E.past.innerHTML=past.length?'':'<div class="empty">No expired posts.</div>';
-  past.forEach(i=>{const d=document.createElement('div');d.className='recent-item';d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>'+esc(i.title)+'</strong><br><span>Expired: '+dt(i.expires)+'</span></div><button class="btn-link" data-delete="'+esc(i.id)+'" style="color:#d71920;font-size:12px">Delete</button></div>';E.past.appendChild(d);});
-}
-
-function renderAdmin(){
-  if(E.loginCard)E.loginCard.classList.toggle('hidden',admin());
-  if(E.center)E.center.classList.toggle('hidden',!admin());
-  if(E.bs)E.bs.innerHTML=live?'<strong>Supabase connected</strong>':'<strong>Not connected</strong>';
-}
-
-function render(){renderPosts();renderRecent();renderPast();renderAdmin();}
-
-function show(s){E.lf.classList.add('hidden');E.rf.classList.add('hidden');E.nf.classList.add('hidden');if(s)(s==='login'?E.lf:s==='reset'?E.rf:E.nf).classList.remove('hidden');}
-
-function switchScreen(s){
-  document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id==='screen-'+s));
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.screen===s));
-  if(s==='admin')renderAdmin();
-  history.replaceState(null,'','#'+s);scrollTo(0,0);
-}
-
-async function init(){
-  let tries=0;
-  while(!window.supabase&&tries<50){await new Promise(r=>setTimeout(r,100));tries++;}
-  if(!window.supabase){on(false);return}
-  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-  try{const{error}=await sb.from('broadcasts').select('id').limit(1);if(error)throw error;}
-  catch(e){console.error('Probe failed:',e.message);on(false);return}
-  live=true;on(true);
-  if(E.bs)E.bs.innerHTML='<strong>Supabase connected</strong><span>Realtime active.</span>';
-  sb.auth.onAuthStateChange((e,session)=>{
-    if(e==='PASSWORD_RECOVERY'){show('new');switchScreen('admin')}
-    if(session?.user){sb.from('admin_profiles').select('is_admin').eq('user_id',session.user.id).eq('is_admin',true).maybeSingle().then(r=>{sessionStorage.setItem('pfm_ad',r.data?'1':'')}).catch(()=>{sessionStorage.removeItem('pfm_ad')});renderAdmin();}
-    else{sessionStorage.removeItem('pfm_ad');renderAdmin();}
+  const { error } = await sb.from('broadcasts').insert({
+    title: E.t.value.trim(),
+    message,
+    priority: document.querySelector('input[name="priority"]:checked')?.value || 'general',
+    expires_at: expires,
+    is_active: true
   });
-  const{data:ses}=await sb.auth.getSession();
-  if(ses?.session?.user){sb.from('admin_profiles').select('is_admin').eq('user_id',ses.session.user.id).eq('is_admin',true).maybeSingle().then(r=>{sessionStorage.setItem('pfm_ad',r.data?'1':'')});}
-  await refresh();sub();
-  const standalone=window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;
-  if(standalone&&!location.hash){switchScreen('posts');return}
-  const s=(location.hash||'#welcome').replace('#','');if(document.querySelector('#screen-'+s))switchScreen(s);
+
+  if (error) throw error;
+  await refresh();
+  toast('Broadcast sent');
+  switchScreen('posts');
 }
+
+async function del(id) {
+  await sb.from('broadcasts').update({ is_active: false }).eq('id', id);
+  await refresh();
+  toast('Deleted');
+}
+
+function renderPosts() {
+  const active = sorted(posts).filter(item => !isRead(item));
+  const readItems = sorted(posts).filter(item => isRead(item));
+  const items = showRead ? readItems : active;
+
+  E.cnt.textContent = `${items.length} post${items.length !== 1 ? 's' : ''}`;
+  if (!showRead) {
+    const unread = active.length;
+    if (unread) E.cnt.textContent += ` - ${unread} unread`;
+  }
+
+  E.list.innerHTML = items.length ? '' : `<div class="empty">${showRead ? 'No read posts yet.' : 'No posts yet.'}</div>`;
+  items.forEach(item => {
+    const card = document.createElement('article');
+    const read = isRead(item);
+    card.className = `post-card ${read ? 'read ' : 'unread '}${esc(item.priority)}`;
+    card.innerHTML = `
+      <div class="post-top">
+        <h3>${esc(item.title)}</h3>
+        <span class="tag ${read ? 'read' : esc(item.priority)}">${read ? 'Read' : prio(item.priority)}</span>
+      </div>
+      <div class="post-body">${renderBody(item.body)}</div>
+      <div class="post-meta">
+        <span>${dt(item.created)}</span>
+        <button class="${read ? 'btn-secondary' : ''}" type="button" data-read="${esc(item.id)}">${read ? 'Read again' : 'I have read this'}</button>
+      </div>
+    `;
+    E.list.appendChild(card);
+  });
+}
+
+function renderRecent() {
+  if (!E.rec) return;
+  const items = sorted(posts).slice(0, 10);
+  E.rec.innerHTML = items.length ? '' : '<div class="empty">No active broadcasts.</div>';
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'recent-item';
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div>
+          <strong>${esc(item.title)}</strong><br>
+          <span>${prio(item.priority)} - ${dt(item.created)}${item.expires ? ` - Expires: ${dt(item.expires)}` : ''}</span>
+        </div>
+        <button class="btn-link" data-delete="${esc(item.id)}" style="color:#d71920;font-size:12px">Delete</button>
+      </div>
+    `;
+    E.rec.appendChild(div);
+  });
+}
+
+function renderPast() {
+  if (!E.past) return;
+  const past = posts.filter(item => item.is_active !== false && item.expires && new Date(item.expires) <= new Date());
+  E.past.innerHTML = past.length ? '' : '<div class="empty">No expired posts.</div>';
+  past.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'recent-item';
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div>
+          <strong>${esc(item.title)}</strong><br>
+          <span>Expired: ${dt(item.expires)}</span>
+        </div>
+        <button class="btn-link" data-delete="${esc(item.id)}" style="color:#d71920;font-size:12px">Delete</button>
+      </div>
+    `;
+    E.past.appendChild(div);
+  });
+}
+
+function renderInstallSteps() {
+  if (!E.is || !E.ib) return;
+
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const ua = navigator.userAgent;
+  const isIOS = /iphone|ipad|ipod/i.test(ua);
+  const isAndroid = /android/i.test(ua);
+
+  if (standalone) {
+    E.is.innerHTML = '<div><strong>Installed.</strong> PFM Broadcasts is already running from the home screen.</div>';
+    E.ib.disabled = true;
+    E.ib.textContent = 'Already installed';
+    return;
+  }
+
+  if (defInstall) {
+    E.is.innerHTML = '<div><strong>Ready.</strong> Tap Install App and confirm the browser prompt.</div>';
+    E.ib.disabled = false;
+    E.ib.textContent = 'Install PFM Broadcasts';
+    return;
+  }
+
+  if (isAndroid) {
+    E.is.innerHTML = `
+      <div><strong>Android Chrome:</strong> open the browser menu and choose Install app or Add to Home screen.</div>
+      <div>If the prompt does not show immediately, open the site over HTTPS and revisit it once.</div>
+    `;
+    E.ib.disabled = true;
+    E.ib.textContent = 'Use Chrome menu';
+    return;
+  }
+
+  if (isIOS) {
+    E.is.innerHTML = '<div><strong>iPhone:</strong> open in Safari, tap Share, then choose Add to Home Screen.</div>';
+    E.ib.disabled = true;
+    E.ib.textContent = 'Use Safari Share';
+    return;
+  }
+
+  E.is.innerHTML = '<div><strong>Desktop:</strong> use the install icon in Chrome or Edge if it appears in the address bar.</div>';
+  E.ib.disabled = true;
+  E.ib.textContent = 'Install option not shown yet';
+}
+
+function renderAdmin() {
+  if (E.loginCard) E.loginCard.classList.toggle('hidden', admin());
+  if (E.center) E.center.classList.toggle('hidden', !admin());
+  if (E.bs) {
+    E.bs.innerHTML = live
+      ? '<strong>Supabase connected</strong><span>Realtime updates are available across devices.</span>'
+      : '<strong>Not connected</strong><span>Supabase did not initialize, so the app is currently offline.</span>';
+  }
+  E.demoOnly.forEach(node => node.classList.toggle('hidden', live));
+}
+
+function render() {
+  renderPosts();
+  renderRecent();
+  renderPast();
+  renderInstallSteps();
+  renderAdmin();
+}
+
+function show(screen) {
+  [E.lf, E.sf, E.rf, E.nf].forEach(form => form?.classList.add('hidden'));
+  const map = { login: E.lf, signup: E.sf, reset: E.rf, new: E.nf };
+  map[screen]?.classList.remove('hidden');
+}
+
+function switchScreen(screen) {
+  document.querySelectorAll('.screen').forEach(node => node.classList.toggle('active', node.id === `screen-${screen}`));
+  document.querySelectorAll('.nav-btn').forEach(node => node.classList.toggle('active', node.dataset.screen === screen));
+  if (screen === 'admin') renderAdmin();
+  history.replaceState(null, '', `#${screen}`);
+  scrollTo(0, 0);
+}
+
+async function init() {
+  render();
+
+  let tries = 0;
+  while (!window.supabase && tries < 50) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    tries += 1;
+  }
+
+  if (!window.supabase) {
+    on(false);
+    render();
+    return;
+  }
+
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  try {
+    const { error } = await sb.from('broadcasts').select('id').limit(1);
+    if (error) throw error;
+  } catch (error) {
+    console.error('Probe failed:', error.message);
+    on(false);
+    render();
+    return;
+  }
+
+  live = true;
+  on(true);
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      show('new');
+      switchScreen('admin');
+    }
+
+    if (session?.user) {
+      sb.from('admin_profiles')
+        .select('is_admin')
+        .eq('user_id', session.user.id)
+        .eq('is_admin', true)
+        .maybeSingle()
+        .then(result => {
+          sessionStorage.setItem('pfm_ad', result.data ? '1' : '');
+          renderAdmin();
+        })
+        .catch(() => {
+          sessionStorage.removeItem('pfm_ad');
+          renderAdmin();
+        });
+    } else {
+      sessionStorage.removeItem('pfm_ad');
+      renderAdmin();
+    }
+  });
+
+  const { data: sessionData } = await sb.auth.getSession();
+  if (sessionData?.session?.user) {
+    sb.from('admin_profiles')
+      .select('is_admin')
+      .eq('user_id', sessionData.session.user.id)
+      .eq('is_admin', true)
+      .maybeSingle()
+      .then(result => {
+        sessionStorage.setItem('pfm_ad', result.data ? '1' : '');
+        renderAdmin();
+      });
+  }
+
+  await refresh();
+  sub();
+
+  const standalone = window.matchMedia('(display-mode:standalone)').matches || window.navigator.standalone === true;
+  if (standalone && !location.hash) {
+    switchScreen('posts');
+    return;
+  }
+
+  const screen = (location.hash || '#welcome').replace('#', '');
+  if (document.querySelector(`#screen-${screen}`)) switchScreen(screen);
+}
+
 init();
 
-document.addEventListener('click',async e=>{
-  const s=e.target.closest('[data-screen]');if(s){switchScreen(s.dataset.screen);return}
-  const r=e.target.closest('[data-read]');if(r){if(!live)return;await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'});reads.add(r.dataset.read);render();toast('Marked as read');return}
-  const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
-    const img=e.target.closest('.img-load');if(img){saveImgCache(img.dataset.img);const el=document.createElement('img');el.src=img.dataset.img;el.loading='lazy';el.style.cssText='width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin-top:6px';el.onerror=()=>el.remove();try{img.replaceWith(el)}catch{render()};return}
-    const vc=e.target.closest('.vid-card');if(vc){const id=vc.dataset.vid;let el;
-    if(id.startsWith('vimeo-')){
-      el=document.createElement('iframe');el.src='https://player.vimeo.com/video/'+id.replace('vimeo-','')+'?autoplay=1';el.allow='autoplay;fullscreen';el.style.cssText='width:100%;aspect-ratio:16/9;border:0;border-radius:12px';
-    }else if(id.includes('.')){
-      el=document.createElement('video');el.src=id;el.controls=true;el.preload='none';el.playsInline=true;el.style.cssText='width:100%;max-height:360px;border-radius:12px;display:block;background:#000';
-    }else{
-      el=document.createElement('iframe');el.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0';el.allow='autoplay;fullscreen;picture-in-picture';el.style.cssText='width:100%;aspect-ratio:16/9;border:0;border-radius:12px';
+document.addEventListener('click', async event => {
+  const screenButton = event.target.closest('[data-screen]');
+  if (screenButton) {
+    switchScreen(screenButton.dataset.screen);
+    return;
+  }
+
+  const readButton = event.target.closest('[data-read]');
+  if (readButton) {
+    if (!live) return;
+    await sb.from('broadcast_reads').upsert(
+      { broadcast_id: readButton.dataset.read, device_id: devId },
+      { onConflict: 'broadcast_id,device_id' }
+    );
+    reads.add(readButton.dataset.read);
+    render();
+    toast('Marked as read');
+    return;
+  }
+
+  const deleteButton = event.target.closest('[data-delete]');
+  if (deleteButton) {
+    if (confirm('Delete this broadcast?')) await del(deleteButton.dataset.delete);
+    return;
+  }
+
+  const imageButton = event.target.closest('.img-load');
+  if (imageButton) {
+    saveImgCache(imageButton.dataset.img);
+    const preview = document.createElement('div');
+    preview.className = 'media-preview';
+    preview.innerHTML = `<img src="${escAttr(imageButton.dataset.img)}" loading="lazy" alt="Broadcast image preview">`;
+    preview.querySelector('img').onerror = () => preview.closest('.media-block')?.remove();
+    try {
+      imageButton.replaceWith(preview);
+    } catch {
+      render();
     }
-    el.onerror=()=>el.remove();try{vc.replaceWith(el)}catch{render()};return}
+    return;
+  }
+
+  const videoButton = event.target.closest('.vid-card');
+  if (videoButton) {
+    const type = videoButton.dataset.kind;
+    const src = videoButton.dataset.src;
+    const id = videoButton.dataset.id;
+    const preview = document.createElement('div');
+    preview.className = 'media-preview';
+    let player;
+
+    if (type === 'youtube') {
+      player = document.createElement('iframe');
+      player.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0`;
+      player.allow = 'autoplay; fullscreen; picture-in-picture';
+      player.style.aspectRatio = '16 / 9';
+    } else if (type === 'vimeo') {
+      player = document.createElement('iframe');
+      player.src = `https://player.vimeo.com/video/${id}?autoplay=1`;
+      player.allow = 'autoplay; fullscreen; picture-in-picture';
+      player.style.aspectRatio = '16 / 9';
+    } else {
+      player = document.createElement('video');
+      player.src = src;
+      player.controls = true;
+      player.preload = 'metadata';
+      player.playsInline = true;
+      player.autoplay = true;
+      player.style.maxHeight = '360px';
+    }
+
+    player.onerror = () => {
+      preview.remove();
+      toast('This video could not be loaded');
+    };
+    preview.appendChild(player);
+
+    try {
+      videoButton.replaceWith(preview);
+      if (player.tagName === 'VIDEO') {
+        const play = player.play?.();
+        if (play?.catch) play.catch(() => {});
+      }
+    } catch {
+      render();
+    }
+  }
 });
 
-E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();toast('Unlocked');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
-E.rf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.resetPasswordForEmail(E.re.value.trim());toast('Email sent');show('login')});
-E.nf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.updateUser({password:E.np.value});toast('Updated');show('login')});
-E.bf?.addEventListener('submit',async e=>{e.preventDefault();try{await create();E.bf.reset()}catch(err){toast(err.message)}});
-E.sr?.addEventListener('click',()=>show('reset'));
-E.bl?.addEventListener('click',()=>show('login'));
-E.lk?.addEventListener('click',()=>{sb.auth.signOut();sessionStorage.removeItem('pfm_ad');renderAdmin();toast('Locked')});
-E.tabA?.addEventListener('click',()=>{showRead=false;E.tabA.classList.add('active');E.tabR.classList.remove('active');renderPosts()});
-E.tabR?.addEventListener('click',()=>{showRead=true;E.tabR.classList.add('active');E.tabA.classList.remove('active');renderPosts()});
+E.lf?.addEventListener('submit', async event => {
+  event.preventDefault();
+  try {
+    await login();
+    toast('Unlocked');
+    renderAdmin();
+  } catch (error) {
+    toast(error.message || 'Login failed');
+  }
+});
 
-window.addEventListener('hashchange',()=>{const s=location.hash.replace('#','');if(document.querySelector('#screen-'+s))switchScreen(s)});
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();defInstall=e});
-window.addEventListener('appinstalled',()=>{defInstall=null});
-window.addEventListener('beforeunload',()=>{if(channel){sb.removeChannel(channel);channel=null}});
-E.ib?.addEventListener('click',async()=>{if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null}});
-E.iw?.addEventListener('click',async()=>{if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null}});
+E.sf?.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!live) {
+    toast('Supabase connection required');
+    return;
+  }
 
-if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js');
+  try {
+    const { data, error } = await sb.auth.signUp({
+      email: E.se.value.trim(),
+      password: E.sp.value
+    });
+    if (error) throw error;
+    if (data.session) await sb.auth.signOut();
+    E.sf.reset();
+    show('login');
+    toast('Account created. Ask an admin to approve access if needed.');
+  } catch (error) {
+    toast(error.message || 'Account creation failed');
+  }
+});
+
+E.rf?.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!live) {
+    toast('Supabase connection required');
+    return;
+  }
+  await sb.auth.resetPasswordForEmail(E.re.value.trim());
+  toast('Email sent');
+  show('login');
+});
+
+E.nf?.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!live) {
+    toast('Supabase connection required');
+    return;
+  }
+  await sb.auth.updateUser({ password: E.np.value });
+  toast('Updated');
+  show('login');
+});
+
+E.bf?.addEventListener('submit', async event => {
+  event.preventDefault();
+  try {
+    await create();
+    E.bf.reset();
+    E.bf.querySelector('input[name="priority"][value="important"]').checked = true;
+  } catch (error) {
+    toast(error.message || 'Could not send broadcast');
+  }
+});
+
+E.sr?.addEventListener('click', () => show('reset'));
+E.ss?.addEventListener('click', () => show('signup'));
+E.bl?.addEventListener('click', () => show('login'));
+E.bsl?.addEventListener('click', () => show('login'));
+E.lk?.addEventListener('click', async () => {
+  if (live) await sb.auth.signOut();
+  sessionStorage.removeItem('pfm_ad');
+  renderAdmin();
+  toast('Locked');
+});
+E.sbSeed?.addEventListener('click', () => toast('Demo tools are hidden while the live backend is connected.'));
+E.sbClear?.addEventListener('click', () => toast('Demo tools are hidden while the live backend is connected.'));
+E.tabA?.addEventListener('click', () => {
+  showRead = false;
+  E.tabA.classList.add('active');
+  E.tabR.classList.remove('active');
+  renderPosts();
+});
+E.tabR?.addEventListener('click', () => {
+  showRead = true;
+  E.tabR.classList.add('active');
+  E.tabA.classList.remove('active');
+  renderPosts();
+});
+
+window.addEventListener('hashchange', () => {
+  const screen = location.hash.replace('#', '');
+  if (document.querySelector(`#screen-${screen}`)) switchScreen(screen);
+});
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  defInstall = event;
+  renderInstallSteps();
+});
+window.addEventListener('appinstalled', () => {
+  defInstall = null;
+  renderInstallSteps();
+});
+window.addEventListener('beforeunload', () => {
+  if (channel) {
+    sb.removeChannel(channel);
+    channel = null;
+  }
+});
+E.ib?.addEventListener('click', async () => {
+  if (!defInstall) {
+    switchScreen('install');
+    renderInstallSteps();
+    return;
+  }
+  defInstall.prompt();
+  await defInstall.userChoice;
+  defInstall = null;
+  renderInstallSteps();
+});
+E.iw?.addEventListener('click', async () => {
+  if (!defInstall) {
+    switchScreen('install');
+    renderInstallSteps();
+    return;
+  }
+  defInstall.prompt();
+  await defInstall.userChoice;
+  defInstall = null;
+  renderInstallSteps();
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');

@@ -460,6 +460,106 @@
       white-space: pre-wrap;
     }
 
+    .post-body {
+      color: #344054;
+      line-height: 1.58;
+      white-space: pre-wrap;
+    }
+
+    .inline-link,
+    .media-link {
+      color: var(--pfm-blue-2);
+      text-decoration: underline;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 3px;
+      word-break: break-word;
+    }
+
+    .media-block {
+      display: grid;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .media-launch {
+      width: 100%;
+      min-height: 110px;
+      padding: 16px 18px;
+      border: 1px solid rgba(7,57,143,.14);
+      border-radius: 20px;
+      background:
+        linear-gradient(145deg, rgba(0,28,82,.96), rgba(7,57,143,.92)),
+        radial-gradient(circle at top right, rgba(255,196,0,.18), transparent 38%);
+      color: #fff;
+      text-align: left;
+      display: grid;
+      gap: 6px;
+      align-content: center;
+      box-shadow: 0 16px 34px rgba(0, 28, 82, .2);
+    }
+
+    .media-launch strong {
+      font-size: 16px;
+      letter-spacing: -.02em;
+    }
+
+    .media-launch span:last-child {
+      color: rgba(255,255,255,.8);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .media-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      min-height: 24px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.18);
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .media-preview {
+      width: 100%;
+      max-height: 360px;
+      border: 1px solid rgba(7,57,143,.12);
+      border-radius: 20px;
+      display: block;
+      overflow: hidden;
+      background: #071633;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .media-preview img,
+    .media-preview video,
+    .media-preview iframe {
+      width: 100%;
+      display: block;
+      border: 0;
+      object-fit: cover;
+      border-radius: inherit;
+      background: #071633;
+    }
+
+    .media-preview img {
+      max-height: 320px;
+    }
+
+    .field-hint {
+      margin: -2px 2px 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+
     .tag {
       flex: 0 0 auto;
       display: inline-flex;
@@ -917,9 +1017,10 @@
                   <textarea id="body" name="body" maxlength="700" placeholder="Type the broadcast message here..." required></textarea>
                 </label>
                 <label>
-                  Image (optional)
-                  <input id="broadcastImage" name="image" type="file" accept="image/jpeg,image/png,image/webp" style="padding:10px" />
+                  Media link (optional)
+                  <input id="broadcastMediaUrl" name="mediaUrl" type="url" inputmode="url" placeholder="https://... image, video, YouTube, Vimeo or document link" />
                 </label>
+                <p class="field-hint">Paste one media URL here and it will be added to the post as a lazy-loaded preview with a clickable link.</p>
                 <label>
                   Priority
                   <div class="priority-row" role="radiogroup" aria-label="Broadcast priority">
@@ -946,15 +1047,13 @@
             <aside class="admin-card">
               <h2>Admin Tools</h2>
               <div class="status-banner" id="backendStatus"></div>
-              <form class="form-grid" id="addAdminForm" style="border:1px solid var(--line);border-radius:16px;padding:14px">
-                <strong style="color:var(--pfm-blue)">Add Admin</strong>
-                <input id="newAdminEmail" type="email" placeholder="new-admin@pfm.co.za" required />
-                <input id="newAdminPassword" type="password" placeholder="Password (min 8 chars)" minlength="8" required />
-                <button type="submit">Add Admin</button>
-              </form>
+              <div class="status-banner">
+                <strong>Admin account setup</strong>
+                <span>New admin users still need to be created in Supabase Auth and approved in <code>admin_profiles</code>. This static build does not expose the service role in-browser.</span>
+              </div>
               <div class="form-actions">
-                <button class="btn-secondary" type="button" id="seedBtn">Add demo posts</button>
-                <button class="btn-secondary" type="button" id="clearBtn">Clear demo posts</button>
+                <button class="btn-secondary" type="button" id="seedBtn" data-demo-only>Add demo posts</button>
+                <button class="btn-secondary" type="button" id="clearBtn" data-demo-only>Clear demo posts</button>
                 <button class="btn-secondary" type="button" id="lockAdminBtn">Lock admin</button>
               </div>
               <div>
