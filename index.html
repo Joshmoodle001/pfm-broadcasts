@@ -560,6 +560,37 @@
       line-height: 1.45;
     }
 
+    .upload-card {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px dashed rgba(7,57,143,.22);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(239,246,255,.72), rgba(255,255,255,.92));
+    }
+
+    .upload-card input[type="file"] {
+      padding: 10px 12px;
+      border-style: dashed;
+      background: rgba(255,255,255,.86);
+    }
+
+    .upload-status {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .upload-status.error {
+      color: var(--pfm-red);
+    }
+
+    .upload-status.success {
+      color: var(--pfm-green);
+    }
+
     .tag {
       flex: 0 0 auto;
       display: inline-flex;
@@ -1020,7 +1051,14 @@
                   Media link (optional)
                   <input id="broadcastMediaUrl" name="mediaUrl" type="url" inputmode="url" placeholder="https://... image, video, YouTube, Vimeo or document link" />
                 </label>
-                <p class="field-hint">Paste one media URL here and it will be added to the post as a lazy-loaded preview with a clickable link.</p>
+                <div class="upload-card">
+                  <label>
+                    Upload image or video (optional)
+                    <input id="broadcastMediaFile" name="mediaFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" />
+                  </label>
+                  <div class="upload-status" id="broadcastMediaStatus" aria-live="polite"></div>
+                </div>
+                <p class="field-hint">Paste a link, upload a file, or use both. Uploaded media is stored in Supabase Storage and added to the post as a lazy-loaded preview. Images and videos are limited to 50 MB each.</p>
                 <label>
                   Priority
                   <div class="priority-row" role="radiogroup" aria-label="Broadcast priority">

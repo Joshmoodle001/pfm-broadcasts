@@ -2,6 +2,7 @@
 
 const SUPABASE_URL = 'https://bmzzbtwhxhijueudznuk.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtenpidHdoeGhpanVldWR6bnVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDQzMzIsImV4cCI6MjA5NzM4MDMzMn0.K8r4XYMrSnCXQ4j_FJw7J4cbzuQ9O1RToDsmCUyLQSM';
+const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
 
 const DEV = 'pfm_did';
 let devId = localStorage.getItem(DEV);
@@ -18,6 +19,7 @@ let reads = new Set();
 let defInstall;
 let showRead = false;
 let imgCache = null;
+let submitBusy = false;
 
 const $ = selector => document.querySelector(selector);
 const E = {
@@ -47,6 +49,8 @@ const E = {
   t: $('#title'),
   b: $('#body'),
   mu: $('#broadcastMediaUrl'),
+  mf: $('#broadcastMediaFile'),
+  ms: $('#broadcastMediaStatus'),
   sbSeed: $('#seedBtn'),
   sbClear: $('#clearBtn'),
   lk: $('#lockAdminBtn'),
@@ -57,6 +61,7 @@ const E = {
   toast: $('#toast'),
   dot: $('#statusDot'),
   lbl: $('#statusLabel'),
+  bSubmit: $('#broadcastForm button[type="submit"]'),
   demoOnly: [...document.querySelectorAll('[data-demo-only]')]
 };
 
@@ -136,6 +141,110 @@ function saveImgCache(url) {
   cache[url] = 1;
   localStorage.setItem('pfm_imgs', JSON.stringify(cache));
   imgCache = cache;
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const power = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / (1024 ** power);
+  return `${value >= 10 || power === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[power]}`;
+}
+
+function setMediaStatus(message, tone) {
+  if (!E.ms) return;
+  E.ms.textContent = message || '';
+  E.ms.classList.remove('error', 'success');
+  if (tone) E.ms.classList.add(tone);
+}
+
+function updateSubmitState(busy, label) {
+  submitBusy = busy;
+  if (!E.bSubmit) return;
+  E.bSubmit.disabled = busy;
+  E.bSubmit.textContent = label || (busy ? 'Sending...' : 'Send Broadcast');
+}
+
+function sanitizeFileSegment(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'media';
+}
+
+function getSelectedMediaFile() {
+  return E.mf?.files?.[0] || null;
+}
+
+function updateMediaSelectionState() {
+  const file = getSelectedMediaFile();
+  if (!file) {
+    setMediaStatus('');
+    return;
+  }
+  setMediaStatus(`${file.name} selected (${formatBytes(file.size)})`);
+}
+
+function validateMediaFile(file) {
+  if (!file) return;
+  if (!(file.type.startsWith('image/') || file.type.startsWith('video/'))) {
+    throw new Error('Only image and video uploads are supported');
+  }
+  if (file.size > MAX_MEDIA_BYTES) {
+    throw new Error('Files must be 50 MB or smaller');
+  }
+}
+
+function getMessageWithMedia(bodyText, mediaUrls) {
+  const parts = [bodyText.trim(), ...mediaUrls.filter(Boolean)];
+  const message = parts.filter(Boolean).join('\n\n');
+  if (message.length > 700) throw new Error('Message plus media links must stay under 700 characters');
+  return message;
+}
+
+async function getAdminAccessToken() {
+  const { data, error } = await sb.auth.getSession();
+  if (error) throw error;
+  const token = data.session?.access_token;
+  if (!token) throw new Error('Admin session expired. Please log in again.');
+  return token;
+}
+
+async function uploadMediaFile(file) {
+  validateMediaFile(file);
+  const authToken = await getAdminAccessToken();
+
+  const signResponse = await fetch('./api/media-upload', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${authToken}`
+    },
+    body: JSON.stringify({
+      fileName: file.name,
+      contentType: file.type || 'application/octet-stream',
+      size: file.size
+    })
+  });
+
+  const signPayload = await signResponse.json().catch(() => ({}));
+  if (!signResponse.ok) throw new Error(signPayload.error || 'Could not prepare upload');
+
+  const uploadResponse = await fetch(signPayload.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream'
+    },
+    body: file
+  });
+
+  if (!uploadResponse.ok) {
+    const uploadPayload = await uploadResponse.text().catch(() => '');
+    throw new Error(uploadPayload || 'Could not upload file');
+  }
+
+  return signPayload.publicUrl;
 }
 
 function shortenUrl(url) {
@@ -343,8 +452,18 @@ async function login() {
 async function create() {
   const hours = document.querySelector('#expiry')?.value;
   const mediaUrl = E.mu?.value.trim();
+  const mediaFile = getSelectedMediaFile();
   const expires = hours ? new Date(Date.now() + Number(hours) * 3600000).toISOString() : null;
-  const message = mediaUrl ? `${E.b.value.trim()}\n\n${mediaUrl}` : E.b.value.trim();
+  const mediaUrls = [];
+
+  if (mediaUrl) mediaUrls.push(mediaUrl);
+  if (mediaFile) {
+    setMediaStatus(`Uploading ${mediaFile.name}...`);
+    mediaUrls.push(await uploadMediaFile(mediaFile));
+    setMediaStatus(`${mediaFile.name} uploaded successfully.`, 'success');
+  }
+
+  const message = getMessageWithMedia(E.b.value, mediaUrls);
 
   const { error } = await sb.from('broadcasts').insert({
     title: E.t.value.trim(),
@@ -744,11 +863,28 @@ E.nf?.addEventListener('submit', async event => {
 E.bf?.addEventListener('submit', async event => {
   event.preventDefault();
   try {
+    updateSubmitState(true, getSelectedMediaFile() ? 'Uploading media...' : 'Sending Broadcast');
     await create();
     E.bf.reset();
     E.bf.querySelector('input[name="priority"][value="important"]').checked = true;
+    setMediaStatus('');
+    updateMediaSelectionState();
   } catch (error) {
     toast(error.message || 'Could not send broadcast');
+    if (error.message) setMediaStatus(error.message, 'error');
+  } finally {
+    updateSubmitState(false);
+  }
+});
+
+E.mf?.addEventListener('change', () => {
+  try {
+    const file = getSelectedMediaFile();
+    if (file) validateMediaFile(file);
+    updateMediaSelectionState();
+  } catch (error) {
+    if (E.mf) E.mf.value = '';
+    setMediaStatus(error.message || 'That file could not be used.', 'error');
   }
 });
 
