@@ -92,8 +92,10 @@ async function create(){
 
 async function del(id){
   if(!live||!admin()){toast('Admin login required');return}
+  const{data:ses}=await sb.auth.getSession();
+  if(!ses?.session){sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');renderAdmin();toast('Session expired. Please log in again.');return}
   const{error}=await sb.from('broadcasts').update({is_active:false}).eq('id',id);
-  if(error){console.error('Delete failed:',error);toast('Delete failed: '+(error.message||'unknown'));return}
+  if(error){console.error('Delete:',error);toast('Delete failed: '+(error.message||''));return}
   posts=posts.filter(p=>p.id!==id);
   render();toast('Deleted');
 }
