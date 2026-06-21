@@ -92,13 +92,16 @@ async function create(){
 
 async function del(id){
   if(!live||!admin()){toast('Admin login required');return}
-  try{await sb.auth.refreshSession()}catch{/* proceed anyway */}
   const{error}=await sb.from('broadcasts').update({is_active:false}).eq('id',id);
   if(error){
-    if(error.code==='42501'||error.message?.includes('row-level')){
-      sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');
-      renderAdmin();toast('Session expired. Please log in again.');
-    }else{toast('Delete failed')}
+    // Force full logout and prompt re-login
+    await sb.auth.signOut();
+    sessionStorage.removeItem('pfm_ad');
+    sessionStorage.removeItem('pfm_ad_ts');
+    renderAdmin();
+    showLogin();
+    switchScreen('admin');
+    toast('Session expired. Please log in again.');
     return;
   }
   posts=posts.filter(p=>p.id!==id);
