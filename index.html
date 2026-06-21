@@ -49,6 +49,7 @@
       min-height: 100%;
       background: var(--pfm-blue);
       scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
     }
 
     body {
@@ -209,7 +210,7 @@
       line-height: 1.1;
     }
 
-    .screen { display: none; animation: rise .18s ease-out; }
+    .screen { display: none; animation: rise .18s ease-out; will-change: transform, opacity; }
     .screen.active { display: block; }
 
     @keyframes rise {
@@ -284,6 +285,7 @@
       background: radial-gradient(circle, rgba(255,196,0,0.25) 0%, rgba(255,196,0,0.05) 40%, transparent 70%);
       filter: blur(20px);
       animation: floatOrb 6s ease-in-out infinite;
+      will-change: transform;
     }
 
     .hero::after {
@@ -299,6 +301,7 @@
       background: radial-gradient(circle, rgba(11,75,211,0.35) 0%, rgba(7,57,143,0.1) 40%, transparent 70%);
       filter: blur(15px);
       animation: floatOrb2 10s ease-in-out infinite;
+      will-change: transform;
     }
 
     .hero-logo {
@@ -464,6 +467,8 @@
       position: relative;
       background: rgba(255,255,255,0.85);
       backdrop-filter: blur(12px);
+      content-visibility: auto;
+      contain-intrinsic-size: 200px;
     }
 
     .post-card::before {
