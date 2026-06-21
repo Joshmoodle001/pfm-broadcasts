@@ -832,6 +832,7 @@ async function init() {
   sub();
 
   const standalone = window.matchMedia('(display-mode:standalone)').matches || window.navigator.standalone === true;
+  if (standalone) { document.body.classList.add('standalone'); }
   if (standalone && !location.hash) {
     switchScreen('posts');
     return;
