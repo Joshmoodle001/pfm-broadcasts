@@ -54,7 +54,12 @@ async function refresh(){
 
 function sub(){if(!sb||channel)return;channel=sb.channel('p').on('postgres_changes',{event:'*',schema:'public',table:'broadcasts'},refresh).on('postgres_changes',{event:'*',schema:'public',table:'broadcast_reads'},refresh).subscribe();}
 
-function admin(){return live&&sessionStorage.getItem('pfm_ad')==='1';}
+function admin(){
+  if(!live||sessionStorage.getItem('pfm_ad')!=='1')return false;
+  const ts=parseInt(sessionStorage.getItem('pfm_ad_ts')||'0');
+  if(Date.now()-ts>43200000){sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');return false}
+  return true;
+}
 
 async function login(){
   const{data,error}=await sb.auth.signInWithPassword({email:E.le.value.trim(),password:E.lp.value});
@@ -62,6 +67,7 @@ async function login(){
   const{data:prof}=await sb.from('admin_profiles').select('is_admin').eq('user_id',data.user.id).eq('is_admin',true).maybeSingle();
   if(!prof)throw new Error('Not an approved admin');
   sessionStorage.setItem('pfm_ad','1');
+  sessionStorage.setItem('pfm_ad_ts',Date.now());
 }
 
 async function create(){
@@ -138,7 +144,7 @@ async function init(){
   if(E.bs)E.bs.innerHTML='<strong>Supabase connected</strong><span>Realtime active.</span>';
   sb.auth.onAuthStateChange((e,session)=>{
     if(e==='PASSWORD_RECOVERY'){show('new');switchScreen('admin')}
-    if(e==='SIGNED_OUT'){sessionStorage.removeItem('pfm_ad');renderAdmin();}
+    if(e==='SIGNED_OUT'){sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');renderAdmin();}
   });
   await refresh();sub();
   const standalone=window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;
@@ -160,7 +166,7 @@ E.nf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.updat
 E.bf?.addEventListener('submit',async e=>{e.preventDefault();try{await create();E.bf.reset()}catch(err){toast(err.message)}});
 E.sr?.addEventListener('click',()=>show('reset'));
 E.bl?.addEventListener('click',()=>show('login'));
-E.lk?.addEventListener('click',()=>{sb.auth.signOut();sessionStorage.removeItem('pfm_ad');renderAdmin();toast('Locked')});
+E.lk?.addEventListener('click',()=>{sb.auth.signOut();sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');renderAdmin();toast('Locked')});
 E.tabA?.addEventListener('click',()=>{showRead=false;E.tabA.classList.add('active');E.tabR.classList.remove('active');renderPosts()});
 E.tabR?.addEventListener('click',()=>{showRead=true;E.tabR.classList.add('active');E.tabA.classList.remove('active');renderPosts()});
 
