@@ -49,6 +49,7 @@
       min-height: 100%;
       background: var(--pfm-blue);
       scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
     }
 
     body {
@@ -209,12 +210,41 @@
       line-height: 1.1;
     }
 
-    .screen { display: none; animation: rise .18s ease-out; }
+    .screen { display: none; animation: rise .18s ease-out; will-change: transform, opacity; }
     .screen.active { display: block; }
 
     @keyframes rise {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes heroBgShift {
+      0% { background-position: 0% 0%, 100% 100%, 50% 50%; }
+      50% { background-position: 100% 0%, 0% 100%, 80% 30%; }
+      100% { background-position: 0% 0%, 100% 100%, 50% 50%; }
+    }
+
+    @keyframes floatOrb {
+      0% { transform: translate(0,0) scale(1); }
+      33% { transform: translate(40px,-30px) scale(1.1); }
+      66% { transform: translate(-20px,20px) scale(0.9); }
+      100% { transform: translate(0,0) scale(1); }
+    }
+
+    @keyframes floatOrb2 {
+      0% { transform: translate(0,0); }
+      50% { transform: translate(-50px,40px); }
+      100% { transform: translate(0,0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+
+    @keyframes scan {
+      0% { top: -10%; }
+      100% { top: 110%; }
     }
 
     .welcome-layout {
@@ -227,48 +257,62 @@
       overflow: hidden;
       min-height: calc(100dvh - 122px - var(--safe-top) - var(--safe-bottom));
       border-radius: 32px;
-      background: linear-gradient(145deg, var(--pfm-blue) 0%, #07398f 100%);
+      background:
+        radial-gradient(circle at 20% 30%, rgba(255,196,0,0.12) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(7,57,143,0.6) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, #001c52 0%, #010f30 100%);
+      background-size: 200% 200%, 150% 150%, 100% 100%;
+      animation: heroBgShift 15s ease-in-out infinite;
       color: #fff;
       padding: clamp(22px, 6vw, 44px);
       display: grid;
       align-content: space-between;
       gap: 42px;
-      box-shadow: var(--shadow-lg);
+      box-shadow: var(--shadow-lg), inset 0 0 100px rgba(255,196,0,0.03);
       isolation: isolate;
     }
 
-    .hero::before,
+    .hero::before {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+      z-index: 1;
+      top: -60px;
+      right: -30px;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,196,0,0.25) 0%, rgba(255,196,0,0.05) 40%, transparent 70%);
+      filter: blur(20px);
+      animation: floatOrb 6s ease-in-out infinite;
+      will-change: transform;
+    }
+
     .hero::after {
       content: "";
       position: absolute;
       pointer-events: none;
-      z-index: -1;
-      transform: rotate(-52deg);
-      border-radius: 999px;
-    }
-
-    .hero::before {
-      right: -48px;
-      top: -92px;
-      width: 82px;
-      height: 330px;
-      background: linear-gradient(180deg, var(--pfm-gold), var(--pfm-gold-2));
-    }
-
-    .hero::after {
-      right: 86px;
-      bottom: -160px;
-      width: 42px;
-      height: 290px;
-      background: rgba(255,255,255,.12);
+      z-index: 1;
+      bottom: -50px;
+      left: -20px;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(11,75,211,0.35) 0%, rgba(7,57,143,0.1) 40%, transparent 70%);
+      filter: blur(15px);
+      animation: floatOrb2 10s ease-in-out infinite;
+      will-change: transform;
     }
 
     .hero-logo {
+      position: relative;
+      z-index: 2;
       width: min(190px, 65vw);
       padding: 12px;
       border-radius: 22px;
-      background: #fff;
-      box-shadow: 0 15px 35px rgba(0,0,0,.18);
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 15px 35px rgba(0,0,0,.18), 0 0 40px rgba(255,196,0,0.08);
     }
 
     .hero-logo img { display: block; width: 100%; }
@@ -423,6 +467,8 @@
       position: relative;
       background: rgba(255,255,255,0.85);
       backdrop-filter: blur(12px);
+      content-visibility: auto;
+      contain-intrinsic-size: 200px;
     }
 
     .post-card::before {
@@ -558,6 +604,85 @@
       font-size: 12px;
       font-weight: 600;
       line-height: 1.45;
+    }
+
+    .upload-card {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px dashed rgba(7,57,143,.22);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(239,246,255,.72), rgba(255,255,255,.92));
+    }
+
+    .upload-card input[type="file"] {
+      padding: 10px 12px;
+      border-style: dashed;
+      background: rgba(255,255,255,.86);
+    }
+
+    .upload-status {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .upload-status.error {
+      color: var(--pfm-red);
+    }
+
+    .upload-status.success {
+      color: var(--pfm-green);
+    }
+
+    .update-banner {
+      position: fixed;
+      z-index: 90;
+      left: 50%;
+      bottom: calc(88px + var(--safe-bottom));
+      transform: translate(-50%, 18px);
+      width: min(560px, calc(100% - 28px));
+      padding: 14px;
+      border: 1px solid rgba(7,57,143,.16);
+      border-radius: 22px;
+      background: rgba(255,255,255,.95);
+      box-shadow: 0 20px 48px rgba(0,28,82,.18);
+      backdrop-filter: blur(18px);
+      display: grid;
+      gap: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .update-banner.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+
+    .update-banner strong {
+      color: var(--pfm-blue);
+      font-size: 14px;
+    }
+
+    .update-banner p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .update-banner-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    .update-banner-actions .btn-secondary {
+      min-height: 44px;
     }
 
     .tag {
@@ -781,6 +906,11 @@
       .desktop-panel { display: grid; }
       .admin-layout { grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); align-items: start; }
       .bottom-nav { display: none; }
+      .update-banner {
+        top: calc(12px + var(--safe-top));
+        bottom: auto;
+        transform: translate(-50%, -16px);
+      }
     }
 
     @media (max-width: 360px) {
@@ -829,7 +959,7 @@
         <img src="assets/pfm-mark-wide.png" alt="PFM logo" />
         <span>Professional Field<br>Marketing</span>
       </button>
-      <button class="btn-ghost" type="button" data-screen="admin" aria-label="Open admin access">
+      <button class="btn-ghost" id="openAdminBtn" type="button" data-screen="admin" aria-label="Open admin access">
         <span id="statusDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d71920;margin-right:6px;vertical-align:middle"></span>
         <span id="statusLabel">Admin</span>
       </button>
@@ -850,7 +980,7 @@
             <div>
               <div class="hero-actions">
                 <button type="button" data-screen="posts">View Posts</button>
-                <button class="btn-gold install-only" type="button" data-screen="install">Install App</button>
+                <button class="btn-gold install-only" type="button" id="smartInstallBtn">Install App</button>
               </div>
               <div class="hero-note">
                 <strong>✓</strong>
@@ -858,23 +988,6 @@
               </div>
             </div>
           </article>
-
-          <aside class="install-card install-only" aria-labelledby="quickInstallTitle">
-            <div class="install-heading">
-              <div class="install-icon">↓</div>
-              <div>
-                <h2 id="quickInstallTitle">Install on Android</h2>
-                <p>Open this website in Chrome, then add it to the home screen.</p>
-              </div>
-            </div>
-            <div class="steps">
-              <div><strong>1.</strong> Open the live PFM Broadcasts link in Chrome.</div>
-              <div><strong>2.</strong> Tap the browser menu or the install prompt.</div>
-              <div><strong>3.</strong> Tap <strong>Install</strong> or <strong>Add to Home screen</strong>.</div>
-            </div>
-            <button type="button" id="installFromWelcomeBtn">Install App</button>
-            <button class="btn-secondary" type="button" data-screen="posts">Skip and view posts</button>
-          </aside>
         </div>
       </section>
 
@@ -1020,7 +1133,21 @@
                   Media link (optional)
                   <input id="broadcastMediaUrl" name="mediaUrl" type="url" inputmode="url" placeholder="https://... image, video, YouTube, Vimeo or document link" />
                 </label>
-                <p class="field-hint">Paste one media URL here and it will be added to the post as a lazy-loaded preview with a clickable link.</p>
+                <div class="upload-card">
+                  <label>
+                    Upload image (optional)
+                    <input id="broadcastImageFile" name="imageFile" type="file" accept="image/*,video/*" />
+                  </label>
+                  <div class="upload-status" id="broadcastImageStatus" aria-live="polite"></div>
+                </div>
+                <div class="upload-card">
+                  <label>
+                    Upload video (optional)
+                    <input id="broadcastVideoFile" name="videoFile" type="file" accept="video/mp4,video/webm,video/quicktime" />
+                  </label>
+                  <div class="upload-status" id="broadcastVideoStatus" aria-live="polite"></div>
+                </div>
+                <p class="field-hint">Paste a link, upload an image, upload a video, or combine them. Uploaded media is stored in Supabase Storage and added to the post as lazy-loaded previews. Images and videos are limited to 50 MB each.</p>
                 <label>
                   Priority
                   <div class="priority-row" role="radiogroup" aria-label="Broadcast priority">
