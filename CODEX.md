@@ -380,34 +380,35 @@ npx vercel --prod
 
 ### Supabase
 ```
-Project URL:   https://<your-project>.supabase.co
-Anon Key:      <from Settings > API>
-Service Key:   <from Settings > API - KEEP SECRET>
+Project URL:   https://bmzzbtwhxhijueudznuk.supabase.co
+Project Ref:   bmzzbtwhxhijueudznuk
+Anon Key:      eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtenpidHdoeGhpanVldWR6bnVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDQzMzIsImV4cCI6MjA5NzM4MDMzMn0.K8r4XYMrSnCXQ4j_FJw7J4cbzuQ9O1RToDsmCUyLQSM
+Service Key:    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtenpidHdoeGhpanVldWR6bnVrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTgwNDMzMiwiZXhwIjoyMDk3MzgwMzMyfQ.uua6_SiWsX0LqFqGa9DBqO8LJEOdTzYkYKA4kkEWV2E
 ```
 
 ### Vercel
 ```
-Team:         <your-team>
+Team:         joshmoodle001s-projects
+Team ID:      team_KoecjwXusaVqiyvMPDHlTElO
 Project:      fmcg-merch-pwa
 Production:   https://fmcg-merch-pwa.vercel.app
-CLI:          npx vercel --prod --yes --scope <your-team>
 ```
 
 ### GitHub
 ```
-Repo:         https://github.com/<owner>/pfm-broadcasts
+Repo:         https://github.com/Joshmoodle001/pfm-broadcasts
 ```
 
-### Admin Account (default demo)
+### Admin Account
 ```
 Email:        admin@pfm.co.za
-Password:     <set during first deploy>
+Password:     PFM2026!
 ```
 
-### app.js Configuration (lines 3-4)
+### app.js Config
 ```js
-const SUPABASE_URL = 'https://<your-project>.supabase.co';
-const SUPABASE_KEY = '<your-anon-key>';
+const SUPABASE_URL = 'https://bmzzbtwhxhijueudznuk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGci...';
 ```
 
 ## Known Limitations
