@@ -206,6 +206,16 @@ window.addEventListener('appinstalled',()=>{defInstall=null});
 window.addEventListener('beforeunload',()=>{if(channel){sb.removeChannel(channel);channel=null}});
 E.ib?.addEventListener('click',async()=>{if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null}});
 E.iw?.addEventListener('click',async()=>{if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null}});
+// Smart install button - detects device
+const smartBtn=$('#smartInstallBtn');
+smartBtn?.addEventListener('click',async()=>{
+  if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null;return}
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const android=/android/i.test(navigator.userAgent);
+  if(ios){toast('Open in Safari → tap Share → Add to Home Screen');switchScreen('install')}
+  else if(android){toast('Open Chrome menu → Install app or Add to Home screen');switchScreen('install')}
+  else{switchScreen('install')}
+});
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js');
 
