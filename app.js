@@ -138,11 +138,8 @@ async function init(){
   if(E.bs)E.bs.innerHTML='<strong>Supabase connected</strong><span>Realtime active.</span>';
   sb.auth.onAuthStateChange((e,session)=>{
     if(e==='PASSWORD_RECOVERY'){show('new');switchScreen('admin')}
-    if(session?.user){sb.from('admin_profiles').select('is_admin').eq('user_id',session.user.id).eq('is_admin',true).maybeSingle().then(r=>{sessionStorage.setItem('pfm_ad',r.data?'1':'')}).catch(()=>{sessionStorage.removeItem('pfm_ad')});renderAdmin();}
-    else{sessionStorage.removeItem('pfm_ad');renderAdmin();}
+    if(e==='SIGNED_OUT'){sessionStorage.removeItem('pfm_ad');renderAdmin();}
   });
-  const{data:ses}=await sb.auth.getSession();
-  if(ses?.session?.user){sb.from('admin_profiles').select('is_admin').eq('user_id',ses.session.user.id).eq('is_admin',true).maybeSingle().then(r=>{sessionStorage.setItem('pfm_ad',r.data?'1':'')});}
   await refresh();sub();
   const standalone=window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;
   if(standalone&&!location.hash){switchScreen('posts');return}
