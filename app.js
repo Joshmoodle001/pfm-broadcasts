@@ -148,7 +148,7 @@ async function init(){
   });
   await refresh();sub();
   const standalone=window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;
-  if(standalone&&!location.hash){switchScreen('posts');return}
+  if(standalone){document.body.classList.add('standalone');switchScreen('posts');return}
   const s=(location.hash||'#welcome').replace('#','');if(document.querySelector('#screen-'+s))switchScreen(s);
 }
 init();
