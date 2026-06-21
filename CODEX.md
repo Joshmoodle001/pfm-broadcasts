@@ -376,64 +376,41 @@ npx vercel --prod
 
 ---
 
-## Credentials & Environment Variables
+## Configuration Reference
 
 ### Supabase
-
 ```
-Project URL:   https://bmzzbtwhxhijueudznuk.supabase.co
-Project Ref:   bmzzbtwhxhijueudznuk
-Anon Key:      eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtenpidHdoeGhpanVldWR6bnVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDQzMzIsImV4cCI6MjA5NzM4MDMzMn0.K8r4XYMrSnCXQ4j_FJw7J4cbzuQ9O1RToDsmCUyLQSM
-Service Key:    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtenpidHdoeGhpanVldWR6bnVrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTgwNDMzMiwiZXhwIjoyMDk3MzgwMzMyfQ.uua6_SiWsX0LqFqGa9DBqO8LJEOdTzYkYKA4kkEWV2E
+Project URL:   https://<your-project>.supabase.co
+Anon Key:      <from Settings > API>
+Service Key:   <from Settings > API - KEEP SECRET>
 ```
-
-> **WARNING:** The service_role key has full database access. Never expose it in front-end code. It is used only for server-side API calls (backend scripts, CI/CD, SQL execution).
 
 ### Vercel
-
 ```
-Team:         joshmoodle001s-projects
-Team ID:      team_KoecjwXusaVqiyvMPDHlTElO
+Team:         <your-team>
 Project:      fmcg-merch-pwa
 Production:   https://fmcg-merch-pwa.vercel.app
-CLI:          npx vercel --prod --yes --scope joshmoodle001s-projects
+CLI:          npx vercel --prod --yes --scope <your-team>
 ```
 
 ### GitHub
-
 ```
-Repo:         https://github.com/Joshmoodle001/pfm-broadcasts
-Owner:        Joshmoodle001
-Token:        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
-Remote:       https://Joshmoodle001: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@github.com/Joshmoodle001/pfm-broadcasts.git
+Repo:         https://github.com/<owner>/pfm-broadcasts
 ```
 
-### Admin Account (Supabase Auth)
-
+### Admin Account (default demo)
 ```
 Email:        admin@pfm.co.za
-Password:     PFM2026!
-User UUID:    3f7ef552-b935-4132-8b8a-80e4c17e07f4
-Role:         admin (via admin_profiles.is_admin = true)
+Password:     <set during first deploy>
 ```
-
-> The `admin@pfm.co.za` user exists in Supabase Auth with an `admin_profiles` row where `is_admin = true`. To create additional admins, log in as this user and use the "Add Admin" form in the Admin Center, or run SQL:
-> ```sql
-> INSERT INTO admin_profiles (user_id, full_name, is_admin) VALUES ('<auth-user-uuid>', 'Name', true);
-> ```
 
 ### app.js Configuration (lines 3-4)
-
 ```js
-const SUPABASE_URL = 'https://bmzzbtwhxhijueudznuk.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtenpidHdoeGhpanVldWR6bnVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDQzMzIsImV4cCI6MjA5NzM4MDMzMn0.K8r4XYMrSnCXQ4j_FJw7J4cbzuQ9O1RToDsmCUyLQSM';
+const SUPABASE_URL = 'https://<your-project>.supabase.co';
+const SUPABASE_KEY = '<your-anon-key>';
 ```
 
-### Project Path
-
-```
-C:\Users\joshm\Desktop\pfm-broadcasts-codex-ready\fmcg-merch-pwa\
-```
+## Known Limitations
 
 
 1. **Supabase free tier** — 500MB database, 2GB bandwidth/month. For thousands of daily users, upgrade to Pro ($25/month).

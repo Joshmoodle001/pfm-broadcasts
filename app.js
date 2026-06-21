@@ -52,7 +52,10 @@ async function refresh(){
   }catch(e){console.error(e)}
 }
 
-function sub(){if(!sb||channel)return;channel=sb.channel('p').on('postgres_changes',{event:'*',schema:'public',table:'broadcasts'},refresh).on('postgres_changes',{event:'*',schema:'public',table:'broadcast_reads'},refresh).subscribe();}
+function sub(){if(!sb||channel)return;channel=sb.channel('p').on('postgres_changes',{event:'INSERT',schema:'public',table:'broadcasts'},p=>{
+  const n=p.new;if(n&&n.priority==='urgent'&&Notification.permission==='granted'){new Notification(n.title,{body:n.message,icon:'/icons/icon-192.png',tag:n.id})}
+  refresh();
+}).on('postgres_changes',{event:'*',schema:'public',table:'broadcast_reads'},refresh).subscribe();}
 
 function admin(){
   if(!live||sessionStorage.getItem('pfm_ad')!=='1')return false;
@@ -155,7 +158,7 @@ function renderPosts(){
   E.cnt.textContent=items.length+' post'+(items.length!==1?'s':'');
   if(!showRead){const u=active.length;if(u)E.cnt.textContent+=' - '+u+' unread';}
   E.list.innerHTML=items.length?'':'<div class="empty">'+(showRead?'No read posts yet.':'No posts yet.')+'</div>';
-  items.forEach(i=>{const c=document.createElement('article');const rd=isRead(i);c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><h3>'+esc(i.title)+'</h3><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><p>'+renderBody(i.body)+'</p><div class="post-meta"><span>'+dt(i.created)+'</span><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);});
+  items.forEach(i=>{try{const c=document.createElement('article');const rd=isRead(i);c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><h3>'+esc(i.title)+'</h3><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><p>'+renderBody(i.body)+'</p><div class="post-meta"><span>'+dt(i.created)+'</span><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);}catch{}});
 }
 
 function renderRecent(){
@@ -195,6 +198,7 @@ async function init(){
   try{const{error}=await sb.from('broadcasts').select('id').limit(1);if(error)throw error;}
   catch(e){console.error('Probe failed:',e.message);on(false);return}
   live=true;on(true);
+  if('Notification' in window&&Notification.permission==='default'){Notification.requestPermission()}
   if(E.bs)E.bs.innerHTML='<strong>Supabase connected</strong><span>Realtime active.</span>';
   sb.auth.onAuthStateChange((e,session)=>{
     if(e==='PASSWORD_RECOVERY'){show('new');switchScreen('admin')}
@@ -209,7 +213,7 @@ init();
 
 document.addEventListener('click',async e=>{
   const s=e.target.closest('[data-screen]');if(s){switchScreen(s.dataset.screen);return}
-  const r=e.target.closest('[data-read]');if(r){if(!live)return;await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'});reads.add(r.dataset.read);render();toast('Marked as read');return}
+  const r=e.target.closest('[data-read]');if(r){if(!live){reads.add(r.dataset.read);render();toast('Marked as read');return}try{await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'})}catch{const q=JSON.parse(localStorage.getItem('pfm_readq')||'[]');if(!q.includes(r.dataset.read)){q.push(r.dataset.read);localStorage.setItem('pfm_readq',JSON.stringify(q))}}reads.add(r.dataset.read);render();toast('Marked as read');return}
   const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
     const img=e.target.closest('.img-load');if(img){saveImgCache(img.dataset.img);const el=document.createElement('img');el.src=img.dataset.img;el.loading='lazy';el.style.cssText='width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin-top:6px';el.onerror=()=>el.remove();try{img.replaceWith(el)}catch{render()};return}
     const vc=e.target.closest('.vid-card');if(vc){const id=vc.dataset.vid;let el;if(id.includes('.')){el=document.createElement('video');el.src=id;el.controls=true;el.preload='none';el.playsInline=true;el.style.cssText='width:100%;max-height:360px;border-radius:12px;display:block;background:#000'}else{el=document.createElement('iframe');el.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0';el.allow='autoplay;fullscreen';el.style.cssText='width:100%;aspect-ratio:16/9;border:0;border-radius:12px'}try{vc.replaceWith(el)}catch{render()};return}
@@ -225,6 +229,12 @@ E.lk?.addEventListener('click',()=>{sb.auth.signOut();sessionStorage.removeItem(
 E.tabA?.addEventListener('click',()=>{showRead=false;E.tabA.classList.add('active');E.tabR.classList.remove('active');renderPosts()});
 E.tabR?.addEventListener('click',()=>{showRead=true;E.tabR.classList.add('active');E.tabA.classList.remove('active');renderPosts()});
 
+window.addEventListener('online',async()=>{
+  const q=JSON.parse(localStorage.getItem('pfm_readq')||'[]');
+  if(!q.length||!sb)return;
+  for(const id of q){try{await sb.from('broadcast_reads').upsert({broadcast_id:id,device_id:devId},{onConflict:'broadcast_id,device_id'})}catch{break}}
+  localStorage.removeItem('pfm_readq');
+});
 window.addEventListener('hashchange',()=>{const s=location.hash.replace('#','');if(document.querySelector('#screen-'+s))switchScreen(s)});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();defInstall=e});
 window.addEventListener('appinstalled',()=>{defInstall=null});
