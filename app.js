@@ -90,7 +90,13 @@ async function create(){
   await refresh();toast('Broadcast sent');switchScreen('posts');
 }
 
-async function del(id){await sb.from('broadcasts').update({is_active:false}).eq('id',id);await refresh();toast('Deleted');}
+async function del(id){
+  if(!live||!admin()){toast('Admin login required');return}
+  const{error}=await sb.from('broadcasts').update({is_active:false}).eq('id',id);
+  if(error){console.error('Delete failed:',error);toast('Delete failed: '+(error.message||'unknown'));return}
+  posts=posts.filter(p=>p.id!==id);
+  render();toast('Deleted');
+}
 
 function renderBody(txt){
   let safe=esc(txt),btns='';
