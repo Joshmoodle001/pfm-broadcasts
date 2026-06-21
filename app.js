@@ -114,7 +114,7 @@ function renderBody(txt){
   safe=safe.replace(/(https?:\/\/\S+)/gi,(url)=>{
     const isImg=/\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(url)||/images\.unsplash\.com\/photo-/.test(url);
     const yt=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-    const isMP4=/\.(mp4|webm|mov)(\?\S*)?$/i.test(url);
+    const isMP4=/\.(mp4|webm|mov)(\?\S*)?$/i.test(url)||/storage\/v1\/object\/public/.test(url);
     if(isImg){
       if(loaded[url]){btns+='<img src="'+url+'" loading="lazy" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin:8px 0" onerror="this.remove()" />';}
       else{btns+='<button class="img-load" data-img="'+url+'" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:var(--soft);color:var(--pfm-blue-2);font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center">Tap to view image</button>';}
