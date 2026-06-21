@@ -74,20 +74,35 @@ async function create(){
   const h=document.querySelector('#expiry')?.value;
   const exp=h?new Date(Date.now()+h*3600000).toISOString():null;
   let msg=E.b.value.trim();
-  // Handle file upload
+  const title=E.t.value.trim();
+  if(!title||!msg){toast('Title and message are required');return}
+
+  // Handle file upload - wait for completion
   const file=document.querySelector('#broadcastImageFile')?.files?.[0];
-  if(file&&live){
+  if(file){
+    const btn=document.querySelector('#broadcastForm button[type="submit"]');
+    const orig=btn.textContent;
+    btn.textContent='Uploading...';btn.disabled=true;
     try{
       const ext=file.name.split('.').pop();
       const path=`broadcasts/${Date.now()}.${ext}`;
-      await sb.storage.from('media').upload(path,file,{upsert:true});
+      const{error:upErr}=await sb.storage.from('media').upload(path,file,{upsert:true});
+      if(upErr)throw upErr;
       const{data}=sb.storage.from('media').getPublicUrl(path);
-      if(data?.publicUrl)msg+='\n'+data.publicUrl;
-    }catch(e){console.error('Upload failed:',e)}
+      if(!data?.publicUrl)throw new Error('Could not get public URL');
+      msg+='\n'+data.publicUrl;
+      toast(file.name+' attached');
+    }catch(e){
+      btn.textContent=orig;btn.disabled=false;
+      toast('Upload failed: '+(e.message||''));
+      return;
+    }finally{btn.textContent='Send Broadcast';btn.disabled=false}
   }
-  const{error}=await sb.from('broadcasts').insert({title:E.t.value.trim(),message:msg,priority:document.querySelector('input[name="priority"]:checked')?.value||'general',expires_at:exp,is_active:true});
-  if(error)throw error;
-  await refresh();toast('Broadcast sent');switchScreen('posts');
+
+  const{error}=await sb.from('broadcasts').insert({title,message:msg,priority:document.querySelector('input[name="priority"]:checked')?.value||'general',expires_at:exp,is_active:true});
+  if(error){toast(error.message);return}
+  await refresh();toast('Broadcast sent');
+  E.bf.reset();switchScreen('posts');
 }
 
 async function del(id){
