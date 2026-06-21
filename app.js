@@ -75,7 +75,7 @@ async function create(){
   const exp=h?new Date(Date.now()+h*3600000).toISOString():null;
   let msg=E.b.value.trim();
   // Handle file upload
-  const file=document.querySelector('#broadcastImage')?.files?.[0];
+  const file=document.querySelector('#broadcastImageFile')?.files?.[0];
   if(file&&live){
     try{
       const ext=file.name.split('.').pop();
