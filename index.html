@@ -595,8 +595,8 @@
       position: fixed;
       z-index: 90;
       left: 50%;
-      top: calc(12px + var(--safe-top));
-      transform: translate(-50%, -16px);
+      bottom: calc(88px + var(--safe-bottom));
+      transform: translate(-50%, 18px);
       width: min(560px, calc(100% - 28px));
       padding: 14px;
       border: 1px solid rgba(7,57,143,.16);
@@ -860,6 +860,11 @@
       .desktop-panel { display: grid; }
       .admin-layout { grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); align-items: start; }
       .bottom-nav { display: none; }
+      .update-banner {
+        top: calc(12px + var(--safe-top));
+        bottom: auto;
+        transform: translate(-50%, -16px);
+      }
     }
 
     @media (max-width: 360px) {
@@ -908,7 +913,7 @@
         <img src="assets/pfm-mark-wide.png" alt="PFM logo" />
         <span>Professional Field<br>Marketing</span>
       </button>
-      <button class="btn-ghost" type="button" data-screen="admin" aria-label="Open admin access">
+      <button class="btn-ghost" id="openAdminBtn" type="button" data-screen="admin" aria-label="Open admin access">
         <span id="statusDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d71920;margin-right:6px;vertical-align:middle"></span>
         <span id="statusLabel">Admin</span>
       </button>
@@ -1168,6 +1173,7 @@
   <nav class="bottom-nav" aria-label="Main navigation">
     <button class="nav-btn active" type="button" data-screen="welcome">Welcome</button>
     <button class="nav-btn" type="button" data-screen="posts">Posts</button>
+    <button class="nav-btn" id="adminNavBtn" type="button" data-screen="admin">Admin</button>
   </nav>
 
   <div class="update-banner" id="updateBanner" role="status" aria-live="polite">

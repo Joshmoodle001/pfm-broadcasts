@@ -59,6 +59,8 @@ const E = {
   sbSeed: $('#seedBtn'),
   sbClear: $('#clearBtn'),
   lk: $('#lockAdminBtn'),
+  oa: $('#openAdminBtn'),
+  an: $('#adminNavBtn'),
   ib: $('#installBtn'),
   iw: $('#installFromWelcomeBtn'),
   is: $('#installSteps'),
@@ -732,6 +734,23 @@ function show(screen) {
   map[screen]?.classList.remove('hidden');
 }
 
+function openScreen(screen, event) {
+  event?.preventDefault();
+  event?.stopPropagation();
+  if (!document.querySelector(`#screen-${screen}`)) return;
+  if (location.hash !== `#${screen}`) history.replaceState(null, '', `#${screen}`);
+  switchScreen(screen);
+}
+
+function bindScreenShortcut(element, screen) {
+  if (!element) return;
+  element.addEventListener('pointerup', event => {
+    if (event.pointerType === 'mouse') return;
+    openScreen(screen, event);
+  });
+  element.addEventListener('click', event => openScreen(screen, event));
+}
+
 function switchScreen(screen) {
   document.querySelectorAll('.screen').forEach(node => node.classList.toggle('active', node.id === `screen-${screen}`));
   document.querySelectorAll('.nav-btn').forEach(node => node.classList.toggle('active', node.dataset.screen === screen));
@@ -827,7 +846,7 @@ init();
 document.addEventListener('click', async event => {
   const screenButton = event.target.closest('[data-screen]');
   if (screenButton) {
-    switchScreen(screenButton.dataset.screen);
+    openScreen(screenButton.dataset.screen, event);
     return;
   }
 
@@ -1043,6 +1062,8 @@ E.tabR?.addEventListener('click', () => {
   E.tabA.classList.remove('active');
   renderPosts();
 });
+bindScreenShortcut(E.oa, 'admin');
+bindScreenShortcut(E.an, 'admin');
 
 window.addEventListener('hashchange', () => {
   const screen = location.hash.replace('#', '');
