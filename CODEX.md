@@ -6,7 +6,7 @@ PFM Broadcasts is a mobile-first PWA broadcasting application for Professional F
 
 **Live URL:** https://fmcg-merch-pwa.vercel.app  
 **Supabase project:** `bmzzbtwhxhijueudznuk`  
-**Admin login:** `admin` / `Pfmpfs1234#`
+**Admin login:** `admin@pfm.co.za` / `PFM2026!`
 
 ---
 
@@ -401,8 +401,8 @@ Repo:         https://github.com/Joshmoodle001/pfm-broadcasts
 
 ### Admin Account
 ```
-Username:     admin
-Password:     Pfmpfs1234#
+Email:        admin@pfm.co.za
+Password:     PFM2026!
 ```
 
 ### app.js Config

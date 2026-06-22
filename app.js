@@ -2,8 +2,6 @@
 
 const SUPABASE_URL = 'https://bmzzbtwhxhijueudznuk.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtenpidHdoeGhpanVldWR6bnVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDQzMzIsImV4cCI6MjA5NzM4MDMzMn0.K8r4XYMrSnCXQ4j_FJw7J4cbzuQ9O1RToDsmCUyLQSM';
-const ADMIN_LOGIN_ALIAS = 'admin';
-const ADMIN_LOGIN_EMAIL = 'admin@pfm.co.za';
 
 const DEV = 'pfm_did';
 let devId = localStorage.getItem(DEV);
@@ -266,14 +264,9 @@ function admin(){
   if(Date.now()-ts>43200000){sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');return false}
   return true;
 }
-function adminEmailFromLogin(value){
-  const login=(value||'').trim().toLowerCase();
-  return login===ADMIN_LOGIN_ALIAS?ADMIN_LOGIN_EMAIL:login;
-}
 
 async function login(){
-  const email=adminEmailFromLogin(E.le.value);
-  const{data,error}=await sb.auth.signInWithPassword({email,password:E.lp.value});
+  const{data,error}=await sb.auth.signInWithPassword({email:E.le.value.trim(),password:E.lp.value});
   if(error)throw error;
   const{data:prof}=await sb.from('admin_profiles').select('is_admin').eq('user_id',data.user.id).eq('is_admin',true).maybeSingle();
   if(!prof)throw new Error('Not an approved admin');
