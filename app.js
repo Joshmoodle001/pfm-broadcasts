@@ -39,6 +39,29 @@ function on(v){if(E.dot)E.dot.style.background=v?'#15803d':'#d71920';if(E.lbl)E.
 
 function getImgCache(){if(!imgCache)imgCache=JSON.parse(localStorage.getItem('pfm_imgs')||'{}');return imgCache;}
 function saveImgCache(url){const c=getImgCache();c[url]=1;localStorage.setItem('pfm_imgs',JSON.stringify(c));imgCache=c;}
+function standalone(){return window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;}
+function ios(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
+function android(){return /android/i.test(navigator.userAgent);}
+function renderInstallSteps(){
+  if(!E.is)return;
+  if(standalone()){
+    E.is.innerHTML='<div><strong>Installed already.</strong> This app is already running from your home screen.</div>';
+    return;
+  }
+  if(defInstall){
+    E.is.innerHTML='<div><strong>Ready to install.</strong> Tap the button above and confirm the install prompt.</div>';
+    return;
+  }
+  if(ios()){
+    E.is.innerHTML='<div><strong>1.</strong> Open this site in Safari.</div><div><strong>2.</strong> Tap the Share button.</div><div><strong>3.</strong> Choose <strong>Add to Home Screen</strong>.</div>';
+    return;
+  }
+  if(android()){
+    E.is.innerHTML='<div><strong>1.</strong> Open this site in Chrome.</div><div><strong>2.</strong> Tap the browser menu.</div><div><strong>3.</strong> Choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</div>';
+    return;
+  }
+  E.is.innerHTML='<div><strong>Install support depends on your browser.</strong> Use Chrome on Android or Safari on iPhone for the best install flow.</div>';
+}
 
 async function refresh(){
   try{
@@ -200,6 +223,7 @@ function render(){renderPosts();renderRecent();renderPast();renderAdmin();}
 function show(s){E.lf.classList.add('hidden');E.rf.classList.add('hidden');E.nf.classList.add('hidden');if(s)(s==='login'?E.lf:s==='reset'?E.rf:E.nf).classList.remove('hidden');}
 
 function switchScreen(s){
+  if(s==='install'&&standalone())s='posts';
   document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id==='screen-'+s));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.screen===s));
   if(s==='admin')renderAdmin();
@@ -216,14 +240,14 @@ async function init(){
   live=true;on(true);
   if('Notification' in window&&Notification.permission==='default'){Notification.requestPermission()}
   if(E.bs)E.bs.innerHTML='<strong>Supabase connected</strong><span>Realtime active.</span>';
+  renderInstallSteps();
   sb.auth.onAuthStateChange((e,session)=>{
     if(e==='PASSWORD_RECOVERY'){show('new');switchScreen('admin')}
     if(e==='SIGNED_OUT'){sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');renderAdmin();}
     if(session?.access_token)sessionStorage.setItem('pfm_tok',session.access_token);
   });
   await refresh();sub();
-  const standalone=window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;
-  if(standalone){document.body.classList.add('standalone');switchScreen('posts');return}
+  if(standalone()){document.body.classList.add('standalone');renderInstallSteps();switchScreen('posts');return}
   const s=(location.hash||'#welcome').replace('#','');if(document.querySelector('#screen-'+s))switchScreen(s);
 }
 init();
@@ -253,20 +277,31 @@ window.addEventListener('online',async()=>{
   localStorage.removeItem('pfm_readq');
 });
 window.addEventListener('hashchange',()=>{const s=location.hash.replace('#','');if(document.querySelector('#screen-'+s))switchScreen(s)});
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();defInstall=e});
-window.addEventListener('appinstalled',()=>{defInstall=null});
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();defInstall=e;renderInstallSteps()});
+window.addEventListener('appinstalled',()=>{defInstall=null;document.body.classList.add('standalone');renderInstallSteps();switchScreen('posts')});
 window.addEventListener('beforeunload',()=>{if(channel){sb.removeChannel(channel);channel=null}});
-E.ib?.addEventListener('click',async()=>{if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null}});
-E.iw?.addEventListener('click',async()=>{if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null}});
+E.ib?.addEventListener('click',async()=>{
+  if(standalone()){switchScreen('posts');return}
+  if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null;renderInstallSteps();return}
+  if(ios()){toast('Open in Safari → tap Share → Add to Home Screen');switchScreen('install');renderInstallSteps();return}
+  if(android()){toast('Open Chrome menu → Install app or Add to Home screen');switchScreen('install');renderInstallSteps();return}
+  toast('Use Chrome on Android or Safari on iPhone to install this app.');
+  switchScreen('install');renderInstallSteps();
+});
+E.iw?.addEventListener('click',async()=>{
+  if(standalone()){switchScreen('posts');return}
+  if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null;renderInstallSteps();return}
+  switchScreen('install');renderInstallSteps();
+});
 // Smart install button - detects device
 const smartBtn=$('#smartInstallBtn');
 smartBtn?.addEventListener('click',async()=>{
-  if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null;return}
-  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
-  const android=/android/i.test(navigator.userAgent);
-  if(ios){toast('Open in Safari → tap Share → Add to Home Screen');switchScreen('install')}
-  else if(android){toast('Open Chrome menu → Install app or Add to Home screen');switchScreen('install')}
-  else{switchScreen('install')}
+  if(standalone()){switchScreen('posts');return}
+  if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null;renderInstallSteps();return}
+  if(ios()){toast('Open in Safari → tap Share → Add to Home Screen');switchScreen('install');renderInstallSteps();return}
+  if(android()){toast('Open Chrome menu → Install app or Add to Home screen');switchScreen('install');renderInstallSteps();return}
+  toast('Use Chrome on Android or Safari on iPhone to install this app.');
+  switchScreen('install');renderInstallSteps();
 });
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js');
