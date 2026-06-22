@@ -8,6 +8,7 @@ let devId = localStorage.getItem(DEV);
 if(!devId){devId=crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2);localStorage.setItem(DEV,devId);}
 
 let sb, live, channel, posts=[], reads=new Set(), defInstall, showRead=false, imgCache=null;
+const MEDIA_CACHE='pfm-media-v1';
 
 const $=s=>document.querySelector(s);
 const E={
@@ -39,6 +40,33 @@ function on(v){if(E.dot)E.dot.style.background=v?'#15803d':'#d71920';if(E.lbl)E.
 
 function getImgCache(){if(!imgCache)imgCache=JSON.parse(localStorage.getItem('pfm_imgs')||'{}');return imgCache;}
 function saveImgCache(url){const c=getImgCache();c[url]=1;localStorage.setItem('pfm_imgs',JSON.stringify(c));imgCache=c;}
+function mediaSaved(url){return !!getImgCache()[url];}
+function mediaCopy(type,saved){return saved?`Tap to open saved ${type}`:`Tap to view ${type}`;}
+async function mediaSrc(url){
+  if(!('caches' in window))return url;
+  const cache=await caches.open(MEDIA_CACHE);
+  let response=await cache.match(url);
+  if(!response){
+    response=await fetch(url,{mode:'cors',credentials:'omit'});
+    if(!response.ok)throw new Error(`Could not load ${url}`);
+    await cache.put(url,response.clone());
+  }
+  saveImgCache(url);
+  return URL.createObjectURL(await response.blob());
+}
+function hardenMedia(el){
+  el.setAttribute('draggable','false');
+  el.addEventListener('contextmenu',event=>event.preventDefault());
+  if(el.tagName==='VIDEO'){
+    el.controls=true;
+    el.preload='metadata';
+    el.playsInline=true;
+    el.disablePictureInPicture=true;
+    el.setAttribute('controlsList','nodownload noplaybackrate');
+    el.setAttribute('disablePictureInPicture','');
+  }
+  return el;
+}
 function standalone(){return window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;}
 function ios(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function android(){return /android/i.test(navigator.userAgent);}
@@ -168,22 +196,22 @@ async function del(id){
 
 function renderBody(txt){
   let safe=esc(txt),btns='';
-  const loaded=getImgCache();
   safe=safe.replace(/(https?:\/\/\S+)/gi,(url)=>{
     const isImg=/\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(url)||/images\.unsplash\.com\/photo-/.test(url);
     const yt=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
     const isMP4=/\.(mp4|webm|mov|3gp|avi|mkv)(\?\S*)?$/i.test(url)||/storage\/v1\/object\/public/.test(url);
     if(isImg){
-      if(loaded[url]){btns+='<img src="'+url+'" loading="lazy" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin:8px 0" onerror="this.remove()" />';}
-      else{btns+='<button class="img-load" data-img="'+url+'" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:var(--soft);color:var(--pfm-blue-2);font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center">Tap to view image</button>';}
+      const saved=mediaSaved(url);
+      btns+='<div class="media-block"><button class="media-launch img-load" type="button" data-img="'+url+'"><span class="media-chip">'+(saved?'Saved image':'Image')+'</span><strong>'+mediaCopy('image',saved)+'</strong><span>'+(saved?'Stored in app data for repeat viewing.':'Loads only when you choose to open it.')+'</span></button></div>';
       return'';
     }
     if(yt){
-      btns+='<div class="vid-card" data-vid="'+yt[1]+'" style="position:relative;width:100%;border-radius:12px;overflow:hidden;cursor:pointer;margin:8px 0;background:#000"><img src="https://img.youtube.com/vi/'+yt[1]+'/hqdefault.jpg" loading="lazy" style="width:100%;display:block;opacity:0.7" /><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:48px;height:48px;border-radius:50%;background:rgba(255,0,0,0.85);display:flex;align-items:center;justify-content:center"><span style="color:#fff;font-size:20px;margin-left:3px">&#9654;</span></div></div></div>';
+      btns+='<div class="media-block"><button class="media-launch vid-card" type="button" data-vid="'+yt[1]+'"><span class="media-chip">Video</span><strong>Tap to play video</strong><span>Streams securely inside the app when opened.</span></button></div>';
       return'';
     }
     if(isMP4){
-      btns+='<div class="vid-card" data-vid="'+url+'" style="position:relative;width:100%;border-radius:12px;overflow:hidden;cursor:pointer;margin:8px 0;background:#000;min-height:160px;display:flex;align-items:center;justify-content:center"><div style="width:48px;height:48px;border-radius:50%;background:rgba(255,0,0,0.85);display:flex;align-items:center;justify-content:center"><span style="color:#fff;font-size:20px;margin-left:3px">&#9654;</span></div></div>';
+      const saved=mediaSaved(url);
+      btns+='<div class="media-block"><button class="media-launch vid-card" type="button" data-vid="'+url+'"><span class="media-chip">'+(saved?'Saved video':'Video')+'</span><strong>'+mediaCopy('video',saved)+'</strong><span>'+(saved?'Stored in app data for repeat playback.':'Loads only when you choose to play it.')+'</span></button></div>';
       return'';
     }
     return '<a href="'+url+'" target="_blank" rel="noopener" style="color:var(--pfm-blue-2);text-decoration:underline;word-break:break-all">'+url+'</a>';
@@ -198,7 +226,7 @@ function renderPosts(){
   E.cnt.textContent=items.length+' post'+(items.length!==1?'s':'');
   if(!showRead){const u=active.length;if(u)E.cnt.textContent+=' - '+u+' unread';}
   E.list.innerHTML=items.length?'':'<div class="empty">'+(showRead?'No read posts yet.':'No posts yet.')+'</div>';
-  items.forEach(i=>{try{const c=document.createElement('article');const rd=isRead(i);c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><h3>'+esc(i.title)+'</h3><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><div class="post-body">'+renderBody(i.body)+'</div><div class="post-meta"><span>'+dt(i.created)+'</span><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);}catch{}});
+  items.forEach(i=>{try{const c=document.createElement('article');const rd=isRead(i);c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><div class="post-heading"><h3>'+esc(i.title)+'</h3><span class="post-date">'+dt(i.created)+'</span></div><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><div class="post-body">'+renderBody(i.body)+'</div><div class="post-meta"><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);}catch{}});
 }
 
 function renderRecent(){
@@ -257,9 +285,11 @@ document.addEventListener('click',async e=>{
   const s=e.target.closest('[data-screen]');if(s){switchScreen(s.dataset.screen);return}
   const r=e.target.closest('[data-read]');if(r){if(!live){reads.add(r.dataset.read);render();toast('Marked as read');return}try{await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'})}catch{const q=JSON.parse(localStorage.getItem('pfm_readq')||'[]');if(!q.includes(r.dataset.read)){q.push(r.dataset.read);localStorage.setItem('pfm_readq',JSON.stringify(q))}}reads.add(r.dataset.read);render();toast('Marked as read');return}
   const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
-    const img=e.target.closest('.img-load');if(img){saveImgCache(img.dataset.img);const el=document.createElement('img');el.src=img.dataset.img;el.loading='lazy';el.style.cssText='width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin-top:6px';el.onerror=()=>el.remove();try{img.replaceWith(el)}catch{render()};return}
-    const vc=e.target.closest('.vid-card');if(vc){const id=vc.dataset.vid;let el;if(id.includes('.')){el=document.createElement('video');el.src=id;el.controls=true;el.preload='none';el.playsInline=true;el.style.cssText='width:100%;max-height:360px;border-radius:12px;display:block;background:#000'}else{el=document.createElement('iframe');el.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0';el.allow='autoplay;fullscreen';el.style.cssText='width:100%;aspect-ratio:16/9;border:0;border-radius:12px'}try{vc.replaceWith(el)}catch{render()};return}
+    const img=e.target.closest('.img-load');if(img){const wrap=document.createElement('div');wrap.className='media-preview';const el=hardenMedia(document.createElement('img'));try{el.src=await mediaSrc(img.dataset.img)}catch{el.src=img.dataset.img}el.loading='lazy';el.referrerPolicy='no-referrer';el.alt='Broadcast image preview';el.onerror=()=>wrap.remove();wrap.appendChild(el);try{img.closest('.media-block')?.replaceWith(wrap)}catch{render()};return}
+    const vc=e.target.closest('.vid-card');if(vc){const id=vc.dataset.vid;let el;if(id.includes('.')){el=hardenMedia(document.createElement('video'));try{el.src=await mediaSrc(id)}catch{el.src=id}el.style.cssText='width:100%;max-height:360px;border-radius:12px;display:block;background:#000'}else{el=document.createElement('iframe');el.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0';el.allow='autoplay;fullscreen';el.style.cssText='width:100%;aspect-ratio:16/9;border:0;border-radius:12px'}const wrap=document.createElement('div');wrap.className='media-preview';wrap.appendChild(el);try{vc.closest('.media-block')?.replaceWith(wrap)}catch{render()};return}
 });
+document.addEventListener('contextmenu',e=>{if(e.target.closest('img,video'))e.preventDefault()});
+document.addEventListener('dragstart',e=>{if(e.target.closest('img,video'))e.preventDefault()});
 
 E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();toast('Unlocked');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
 E.rf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.resetPasswordForEmail(E.re.value.trim());toast('Email sent');show('login')});

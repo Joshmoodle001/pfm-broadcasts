@@ -491,12 +491,25 @@
       align-items: flex-start;
     }
 
+    .post-heading {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
     .post-card h3 {
       margin: 0;
       color: var(--ink);
       font-size: clamp(19px, 5.5vw, 26px);
       letter-spacing: -.02em;
       line-height: 1.05;
+    }
+
+    .post-date {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+      line-height: 1.3;
     }
 
     .post-card p {
@@ -711,6 +724,7 @@
       color: var(--muted);
       font-size: 13px;
       font-weight: 750;
+      justify-content: end;
     }
 
     .post-meta button { width: 100%; }
