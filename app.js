@@ -10,6 +10,7 @@ if(!devId){devId=crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.rando
 let sb, live, channel, posts=[], reads=new Set(), defInstall, showRead=false, imgCache=null;
 const MEDIA_CACHE='pfm-media-v1';
 const MEDIA_META='pfm_media_meta_v1';
+const READ_ACK_KEY='pfm_reads_ack_v1';
 let mediaMetaCache=null;
 const mediaMetaPending=new Set();
 const VIEW_THRESHOLD=.65;
@@ -39,7 +40,6 @@ function dt(d){return new Intl.DateTimeFormat('en-ZA',{day:'2-digit',month:'shor
 function prio(p){return{urgent:'Urgent',important:'Important',general:'General'}[p]||'General';}
 function norm(r){return{id:r.id,title:r.title,body:r.body||r.message,priority:r.priority||'general',created:r.created_at||r.created||new Date().toISOString(),expires:r.expires_at||null,is_active:r.isActive??r.is_active??true};}
 function isRead(i){return reads.has(i.id);}
-function isSeen(i){return reads.has(i.id)||viewedNow.has(i.id);}
 function sorted(a,expired){
   let arr=[...a].filter(i=>i.is_active!==false);
   if(!expired)arr=arr.filter(i=>!i.expires||new Date(i.expires)>new Date());
@@ -48,6 +48,13 @@ function sorted(a,expired){
 function on(v){if(E.dot)E.dot.style.background=v?'#15803d':'#d71920';if(E.lbl)E.lbl.textContent=v?'Connected':'Offline';}
 
 function getImgCache(){if(!imgCache)imgCache=JSON.parse(localStorage.getItem('pfm_imgs')||'{}');return imgCache;}
+function getReadAckStore(){
+  try{return new Set(JSON.parse(localStorage.getItem(READ_ACK_KEY)||'[]').filter(Boolean))}
+  catch{return new Set()}
+}
+function saveReadAckStore(){
+  localStorage.setItem(READ_ACK_KEY,JSON.stringify([...reads]));
+}
 function saveImgCache(url){const c=getImgCache();c[url]=1;localStorage.setItem('pfm_imgs',JSON.stringify(c));imgCache=c;}
 function getMediaMeta(){if(!mediaMetaCache)mediaMetaCache=JSON.parse(localStorage.getItem(MEDIA_META)||'{}');return mediaMetaCache;}
 function saveMediaMeta(url,meta){const all=getMediaMeta();all[url]={...(all[url]||{}),...meta};localStorage.setItem(MEDIA_META,JSON.stringify(all));mediaMetaCache=all;}
@@ -326,13 +333,12 @@ function renderInstallSteps(){
 async function refresh(){
   try{
     const statsReq=admin()?sb.from('broadcast_reads').select('broadcast_id,read_at').order('read_at',{ascending:false}).limit(5000):Promise.resolve({data:null,error:null});
-    const[a,b,c]=await Promise.all([
+    const[a,c]=await Promise.all([
       sb.from('broadcasts').select('id,title,message,priority,created_at,expires_at,is_active').eq('is_active',true).order('created_at',{ascending:false}).limit(200),
-      sb.from('broadcast_reads').select('broadcast_id').eq('device_id',devId),
       statsReq
     ]);
     if(!a.error)posts=(a.data||[]).map(norm);
-    if(!b.error)reads=new Set((b.data||[]).map(r=>r.broadcast_id));
+    reads=getReadAckStore();
     readStats=admin()&&!c?.error?aggregateReadStats(c.data):new Map();
     render();
   }catch(e){console.error(e)}
@@ -408,7 +414,7 @@ async function create(){
   const{error}=await sb.from('broadcasts').insert({title,message:msg,priority:document.querySelector('input[name="priority"]:checked')?.value||'general',expires_at:exp,is_active:true});
   if(error){toast(error.message);return}
   await refresh();toast('Broadcast sent');
-  E.bf.reset();if(imgStatus)imgStatus.textContent='';if(vidStatus)vidStatus.textContent='';switchScreen('posts');
+  E.bf.reset();if(imgStatus)imgStatus.textContent='';if(vidStatus)vidStatus.textContent='';
 }
 
 async function del(id){
@@ -457,13 +463,13 @@ function renderBody(txt){
 }
 
 function renderPosts(){
-  const active=sorted(posts).filter(i=>!reads.has(i.id)||viewedNow.has(i.id));
-  const readItems=sorted(posts).filter(i=>isSeen(i));
+  const active=sorted(posts).filter(i=>!isRead(i));
+  const readItems=sorted(posts).filter(i=>isRead(i));
   const items=showRead?readItems:active;
   E.cnt.textContent=items.length+' post'+(items.length!==1?'s':'');
-  if(!showRead){const unseen=sorted(posts).filter(i=>!isSeen(i)).length;if(unseen)E.cnt.textContent+=' - '+unseen+' not yet viewed';}
+  if(!showRead){const u=active.length;if(u)E.cnt.textContent+=' - '+u+' unread';}
   E.list.innerHTML=items.length?'':'<div class="empty">'+(showRead?'No read posts yet.':'No posts yet.')+'</div>';
-  items.forEach(i=>{try{const c=document.createElement('article');const rd=isRead(i),seen=viewedNow.has(i.id);c.dataset.postId=i.id;c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><div class="post-heading"><h3>'+esc(i.title)+'</h3><span class="post-date">'+dt(i.created)+'</span></div><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><div class="post-body">'+renderBody(i.body)+'</div><div class="post-meta"><button class="'+((rd||seen)?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':seen?'Viewed on this device':'I have read this')+'</button></div>';E.list.appendChild(c);}catch{}});
+  items.forEach(i=>{try{const c=document.createElement('article');const rd=isRead(i);c.dataset.postId=i.id;c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><div class="post-heading"><h3>'+esc(i.title)+'</h3><span class="post-date">'+dt(i.created)+'</span></div><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><div class="post-body">'+renderBody(i.body)+'</div><div class="post-meta"><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);}catch{}});
   observePostViews();
 }
 
@@ -538,7 +544,7 @@ init();
 
 document.addEventListener('click',async e=>{
   const s=e.target.closest('[data-screen]');if(s){switchScreen(s.dataset.screen);return}
-  const r=e.target.closest('[data-read]');if(r){await registerView(r.dataset.read,{acknowledged:true});render();toast('Marked as read');return}
+  const r=e.target.closest('[data-read]');if(r){reads.add(r.dataset.read);saveReadAckStore();await registerView(r.dataset.read,{acknowledged:true});render();toast('Marked as read');return}
   const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
     const img=e.target.closest('.img-load');if(img){const wrap=document.createElement('div');wrap.className='media-preview';const el=hardenMedia(document.createElement('img'));try{el.src=await mediaSrc(img.dataset.img)}catch{el.src=img.dataset.img}el.loading='lazy';el.referrerPolicy='no-referrer';el.alt='Broadcast image preview';el.onerror=()=>wrap.remove();wrap.appendChild(el);enableImageZoom(wrap,el);try{img.closest('.media-block')?.replaceWith(wrap)}catch{render()};return}
     const vc=e.target.closest('.vid-card');if(vc){const id=vc.dataset.vid;let el;if(id.includes('.')){el=hardenMedia(document.createElement('video'));try{el.src=await mediaSrc(id)}catch{el.src=id}el.style.cssText='width:100%;max-height:360px;border-radius:12px;display:block;background:#000'}else{el=document.createElement('iframe');el.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0';el.allow='autoplay;fullscreen';el.style.cssText='width:100%;aspect-ratio:16/9;border:0;border-radius:12px'}const wrap=document.createElement('div');wrap.className='media-preview';wrap.appendChild(el);try{vc.closest('.media-block')?.replaceWith(wrap)}catch{render()};return}
