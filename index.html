@@ -592,6 +592,7 @@
       border-radius: 20px;
       display: block;
       overflow: hidden;
+      position: relative;
       background: #071633;
       box-shadow: var(--shadow-sm);
     }
@@ -609,6 +610,43 @@
 
     .media-preview img {
       max-height: 320px;
+    }
+
+    .media-preview.zoomable-media {
+      touch-action: none;
+      background:
+        radial-gradient(circle at top, rgba(255,196,0,.12), transparent 34%),
+        #071633;
+    }
+
+    .media-preview.zoomable-media img {
+      max-height: min(72vh, 480px);
+      object-fit: contain;
+      transform-origin: center center;
+      touch-action: none;
+      user-select: none;
+      cursor: zoom-in;
+      will-change: transform;
+    }
+
+    .media-zoom-hint {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(7,22,51,.74);
+      border: 1px solid rgba(255,255,255,.14);
+      color: rgba(255,255,255,.92);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .03em;
+      pointer-events: none;
+      transition: opacity .25s ease;
+    }
+
+    .media-zoom-hint.fade {
+      opacity: 0;
     }
 
     .field-hint {
