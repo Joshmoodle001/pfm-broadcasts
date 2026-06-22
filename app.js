@@ -85,10 +85,15 @@ async function create(){
   const imgFile=document.querySelector('#broadcastImageFile')?.files?.[0];
   const vidFile=document.querySelector('#broadcastVideoFile')?.files?.[0];
   const file=imgFile||vidFile;
+  const imgStatus=document.querySelector('#broadcastImageStatus');
+  const vidStatus=document.querySelector('#broadcastVideoStatus');
   if(file){
+    if(file.size>52428800){toast('File too large (max 50 MB)');return}
     const btn=document.querySelector('#broadcastForm button[type="submit"]');
     const orig=btn.textContent;
     btn.textContent='Uploading...';btn.disabled=true;
+    if(imgFile&&imgStatus)imgStatus.textContent='Uploading...';
+    if(vidFile&&vidStatus)vidStatus.textContent='Uploading...';
     try{
       const{data:{session}}=await sb.auth.getSession();
       const tok=session?.access_token||sessionStorage.getItem('pfm_tok')||'';
@@ -98,11 +103,17 @@ async function create(){
       const r2=await fetch(j1.uploadUrl,{method:'PUT',body:file,headers:{'Content-Type':file.type||'application/octet-stream'}});
       if(!r2.ok)throw new Error('File upload failed');
       msg+='\n'+j1.publicUrl;
+      if(imgStatus)imgStatus.textContent='Uploaded';
+      if(vidStatus)vidStatus.textContent='Uploaded';
       toast(file.name+' attached');
     }catch(e){
       const em=e.message||'Upload failed';
       sessionStorage.setItem('pfm_err',em);
+      if(imgStatus)imgStatus.textContent='Failed: '+em;
+      if(vidStatus)vidStatus.textContent='Failed: '+em;
       toast('Upload failed: '+em);
+      document.querySelector('#broadcastImageFile').value='';
+      document.querySelector('#broadcastVideoFile').value='';
       return;
     }finally{btn.textContent='Send Broadcast';btn.disabled=false}
   }
@@ -110,7 +121,7 @@ async function create(){
   const{error}=await sb.from('broadcasts').insert({title,message:msg,priority:document.querySelector('input[name="priority"]:checked')?.value||'general',expires_at:exp,is_active:true});
   if(error){toast(error.message);return}
   await refresh();toast('Broadcast sent');
-  E.bf.reset();switchScreen('posts');
+  E.bf.reset();if(imgStatus)imgStatus.textContent='';if(vidStatus)vidStatus.textContent='';switchScreen('posts');
 }
 
 async function del(id){
@@ -208,6 +219,7 @@ async function init(){
   sb.auth.onAuthStateChange((e,session)=>{
     if(e==='PASSWORD_RECOVERY'){show('new');switchScreen('admin')}
     if(e==='SIGNED_OUT'){sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');renderAdmin();}
+    if(session?.access_token)sessionStorage.setItem('pfm_tok',session.access_token);
   });
   await refresh();sub();
   const standalone=window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;
