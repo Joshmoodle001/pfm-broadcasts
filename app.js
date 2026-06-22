@@ -3,11 +3,7 @@
 const SUPABASE_URL = 'https://bmzzbtwhxhijueudznuk.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtenpidHdoeGhpanVldWR6bnVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDQzMzIsImV4cCI6MjA5NzM4MDMzMn0.K8r4XYMrSnCXQ4j_FJw7J4cbzuQ9O1RToDsmCUyLQSM';
 
-const DEV = 'pfm_did';
-let devId = localStorage.getItem(DEV);
-if(!devId){devId=crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2);localStorage.setItem(DEV,devId);}
-
-let sb, live, channel, posts=[], reads=new Set(), defInstall, showRead=false, imgCache=null;
+let sb, live, channel, posts=[], defInstall, imgCache=null;
 const MEDIA_CACHE='pfm-media-v1';
 const MEDIA_META='pfm_media_meta_v1';
 let mediaMetaCache=null;
@@ -16,7 +12,6 @@ const mediaMetaPending=new Set();
 const $=s=>document.querySelector(s);
 const E={
   list:$('#postsList'),cnt:$('#postCount'),rec:$('#recentList'),past:$('#pastList'),
-  tabA:$('#tabActive'),tabR:$('#tabRead'),
   loginCard:$('#adminLoginCard'),center:$('#adminCenter'),
   lf:$('#adminLoginForm'),le:$('#adminEmail'),lp:$('#adminPassword'),
   rf:$('#resetPasswordForm'),re:$('#resetEmail'),
@@ -33,11 +28,10 @@ function esc(s){const d=document.createElement('div');d.textContent=s||'';return
 function dt(d){return new Intl.DateTimeFormat('en-ZA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(d));}
 function prio(p){return{urgent:'Urgent',important:'Important',general:'General'}[p]||'General';}
 function norm(r){return{id:r.id,title:r.title,body:r.body||r.message,priority:r.priority||'general',created:r.created_at||r.created||new Date().toISOString(),expires:r.expires_at||null,is_active:r.isActive??r.is_active??true};}
-function isRead(i){return reads.has(i.id);}
 function sorted(a,expired){
   let arr=[...a].filter(i=>i.is_active!==false);
   if(!expired)arr=arr.filter(i=>!i.expires||new Date(i.expires)>new Date());
-  return arr.sort((a,b)=>{const ar=isRead(a)?1:0,br=isRead(b)?1:0;if(ar!==br)return ar-br;const ap={urgent:3,important:2,general:1}[a.priority]||0,bp={urgent:3,important:2,general:1}[b.priority]||0;if(ap!==bp)return bp-ap;return new Date(b.created)-new Date(a.created);});
+  return arr.sort((a,b)=>{const ap={urgent:3,important:2,general:1}[a.priority]||0,bp={urgent:3,important:2,general:1}[b.priority]||0;if(ap!==bp)return bp-ap;return new Date(b.created)-new Date(a.created);});
 }
 function on(v){if(E.dot)E.dot.style.background=v?'#15803d':'#d71920';if(E.lbl)E.lbl.textContent=v?'Connected':'Offline';}
 
@@ -268,12 +262,8 @@ function renderInstallSteps(){
 
 async function refresh(){
   try{
-    const[a,b]=await Promise.all([
-      sb.from('broadcasts').select('id,title,message,priority,created_at,expires_at,is_active').eq('is_active',true).order('created_at',{ascending:false}).limit(200),
-      sb.from('broadcast_reads').select('broadcast_id').eq('device_id',devId)
-    ]);
-    if(!a.error)posts=(a.data||[]).map(norm);
-    if(!b.error)reads=new Set((b.data||[]).map(r=>r.broadcast_id));
+    const { data, error } = await sb.from('broadcasts').select('id,title,message,priority,created_at,expires_at,is_active').eq('is_active',true).order('created_at',{ascending:false}).limit(200);
+    if(!error)posts=(data||[]).map(norm);
     render();
   }catch(e){console.error(e)}
 }
@@ -281,7 +271,7 @@ async function refresh(){
 function sub(){if(!sb||channel)return;channel=sb.channel('p').on('postgres_changes',{event:'INSERT',schema:'public',table:'broadcasts'},p=>{
   const n=p.new;if(n&&n.priority==='urgent'&&Notification.permission==='granted'){new Notification(n.title,{body:n.message,icon:'/icons/icon-192.png',tag:n.id})}
   refresh();
-}).on('postgres_changes',{event:'*',schema:'public',table:'broadcast_reads'},refresh).subscribe();}
+}).subscribe();}
 
 function admin(){
   if(!live||sessionStorage.getItem('pfm_ad')!=='1')return false;
@@ -307,7 +297,6 @@ async function create(){
   const title=E.t.value.trim();
   if(!title||!msg){toast('Title and message are required');return}
 
-  // Handle file upload - wait for completion
   const imgFile=document.querySelector('#broadcastImageFile')?.files?.[0];
   const vidFile=document.querySelector('#broadcastVideoFile')?.files?.[0];
   const imgStatus=document.querySelector('#broadcastImageStatus');
@@ -323,7 +312,11 @@ async function create(){
       const tok=session?.access_token||sessionStorage.getItem('pfm_tok')||'';
       const urls=[];
       for(const upload of uploads){
-        const r1=await fetch('/api/upload',{method:'POST',body:JSON.stringify({fileName:upload.file.name}),headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok}});
+        const r1=await fetch('/api/media-upload',{
+          method:'POST',
+          body:JSON.stringify({fileName:upload.file.name,contentType:upload.file.type||'application/octet-stream',size:upload.file.size}),
+          headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok}
+        });
         const j1=await r1.json();
         if(!r1.ok||!j1.uploadUrl)throw new Error(j1.error||`Failed to get ${upload.label} upload URL`);
         const r2=await fetch(j1.uploadUrl,{method:'PUT',body:upload.file,headers:{'Content-Type':upload.file.type||'application/octet-stream'}});
@@ -348,7 +341,7 @@ async function create(){
   const{error}=await sb.from('broadcasts').insert({title,message:msg,priority:document.querySelector('input[name="priority"]:checked')?.value||'general',expires_at:exp,is_active:true});
   if(error){toast(error.message);return}
   await refresh();toast('Broadcast sent');
-  E.bf.reset();if(imgStatus)imgStatus.textContent='';if(vidStatus)vidStatus.textContent='';switchScreen('posts');
+  E.bf.reset();if(imgStatus)imgStatus.textContent='';if(vidStatus)vidStatus.textContent='';
 }
 
 async function del(id){
@@ -397,13 +390,10 @@ function renderBody(txt){
 }
 
 function renderPosts(){
-  const active=sorted(posts).filter(i=>!isRead(i));
-  const readItems=sorted(posts).filter(i=>isRead(i));
-  const items=showRead?readItems:active;
+  const items=sorted(posts);
   E.cnt.textContent=items.length+' post'+(items.length!==1?'s':'');
-  if(!showRead){const u=active.length;if(u)E.cnt.textContent+=' - '+u+' unread';}
-  E.list.innerHTML=items.length?'':'<div class="empty">'+(showRead?'No read posts yet.':'No posts yet.')+'</div>';
-  items.forEach(i=>{try{const c=document.createElement('article');const rd=isRead(i);c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><div class="post-heading"><h3>'+esc(i.title)+'</h3><span class="post-date">'+dt(i.created)+'</span></div><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><div class="post-body">'+renderBody(i.body)+'</div><div class="post-meta"><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);}catch{}});
+  E.list.innerHTML=items.length?'':'<div class="empty">No posts yet.</div>';
+  items.forEach(i=>{try{const c=document.createElement('article');c.className='post-card unread '+esc(i.priority);c.innerHTML='<div class="post-top"><div class="post-heading"><h3>'+esc(i.title)+'</h3><span class="post-date">'+dt(i.created)+'</span></div><span class="tag '+esc(i.priority)+'">'+prio(i.priority)+'</span></div><div class="post-body">'+renderBody(i.body)+'</div>';E.list.appendChild(c);}catch{}});
 }
 
 function renderRecent(){
@@ -460,7 +450,6 @@ init();
 
 document.addEventListener('click',async e=>{
   const s=e.target.closest('[data-screen]');if(s){switchScreen(s.dataset.screen);return}
-  const r=e.target.closest('[data-read]');if(r){if(!live){reads.add(r.dataset.read);render();toast('Marked as read');return}try{await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'})}catch{const q=JSON.parse(localStorage.getItem('pfm_readq')||'[]');if(!q.includes(r.dataset.read)){q.push(r.dataset.read);localStorage.setItem('pfm_readq',JSON.stringify(q))}}reads.add(r.dataset.read);render();toast('Marked as read');return}
   const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
     const img=e.target.closest('.img-load');if(img){const wrap=document.createElement('div');wrap.className='media-preview';const el=hardenMedia(document.createElement('img'));try{el.src=await mediaSrc(img.dataset.img)}catch{el.src=img.dataset.img}el.loading='lazy';el.referrerPolicy='no-referrer';el.alt='Broadcast image preview';el.onerror=()=>wrap.remove();wrap.appendChild(el);enableImageZoom(wrap,el);try{img.closest('.media-block')?.replaceWith(wrap)}catch{render()};return}
     const vc=e.target.closest('.vid-card');if(vc){const id=vc.dataset.vid;let el;if(id.includes('.')){el=hardenMedia(document.createElement('video'));try{el.src=await mediaSrc(id)}catch{el.src=id}el.style.cssText='width:100%;max-height:360px;border-radius:12px;display:block;background:#000'}else{el=document.createElement('iframe');el.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0';el.allow='autoplay;fullscreen';el.style.cssText='width:100%;aspect-ratio:16/9;border:0;border-radius:12px'}const wrap=document.createElement('div');wrap.className='media-preview';wrap.appendChild(el);try{vc.closest('.media-block')?.replaceWith(wrap)}catch{render()};return}
@@ -471,24 +460,16 @@ document.addEventListener('dragstart',e=>{if(e.target.closest('img,video'))e.pre
 E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();toast('Admin signed in');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
 E.rf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.resetPasswordForEmail(E.re.value.trim());toast('Email sent');show('login')});
 E.nf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.updateUser({password:E.np.value});toast('Updated');show('login')});
-E.bf?.addEventListener('submit',async e=>{e.preventDefault();try{await create();E.bf.reset()}catch(err){toast(err.message)}});
+E.bf?.addEventListener('submit',async e=>{e.preventDefault();try{await create()}catch(err){toast(err.message)}});
 E.sr?.addEventListener('click',()=>show('reset'));
 E.bl?.addEventListener('click',()=>show('login'));
 E.lk?.addEventListener('click',()=>{sb.auth.signOut();sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');renderAdmin();toast('Admin locked')});
-E.tabA?.addEventListener('click',()=>{showRead=false;E.tabA.classList.add('active');E.tabR.classList.remove('active');renderPosts()});
-E.tabR?.addEventListener('click',()=>{showRead=true;E.tabR.classList.add('active');E.tabA.classList.remove('active');renderPosts()});
 $('#clearSavedMediaBtn')?.addEventListener('click',async()=>{
   if(!confirm('Clear all saved image and video copies from this device? You will need to tap to load them again.'))return;
   await clearSavedMedia();
   toast('Saved media cleared from this device');
 });
 
-window.addEventListener('online',async()=>{
-  const q=JSON.parse(localStorage.getItem('pfm_readq')||'[]');
-  if(!q.length||!sb)return;
-  for(const id of q){try{await sb.from('broadcast_reads').upsert({broadcast_id:id,device_id:devId},{onConflict:'broadcast_id,device_id'})}catch{break}}
-  localStorage.removeItem('pfm_readq');
-});
 window.addEventListener('hashchange',()=>{const s=location.hash.replace('#','');if(document.querySelector('#screen-'+s))switchScreen(s)});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();defInstall=e;renderInstallSteps()});
 window.addEventListener('appinstalled',()=>{defInstall=null;document.body.classList.add('standalone');renderInstallSteps();switchScreen('posts')});
