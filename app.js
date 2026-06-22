@@ -214,6 +214,7 @@ function enableImageZoom(wrap,img){
 function standalone(){return window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;}
 function ios(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function android(){return /android/i.test(navigator.userAgent);}
+function samsungBrowser(){return /samsungbrowser/i.test(navigator.userAgent);}
 async function openInstallFlow(){
   if(standalone()){switchScreen('posts');return;}
   if(defInstall){
@@ -225,6 +226,12 @@ async function openInstallFlow(){
   }
   if(ios()){
     toast('Open in Safari → tap Share → Add to Home Screen');
+    switchScreen('install');
+    renderInstallSteps();
+    return;
+  }
+  if(samsungBrowser()){
+    toast('For Android install, open this in Chrome and install it there.');
     switchScreen('install');
     renderInstallSteps();
     return;
@@ -251,6 +258,10 @@ function renderInstallSteps(){
   }
   if(ios()){
     E.is.innerHTML='<div><strong>1.</strong> Open this site in Safari.</div><div><strong>2.</strong> Tap the Share button.</div><div><strong>3.</strong> Choose <strong>Add to Home Screen</strong>.</div>';
+    return;
+  }
+  if(samsungBrowser()){
+    E.is.innerHTML='<div><strong>1.</strong> Open this site in the latest Google Chrome on Android.</div><div><strong>2.</strong> Tap the Welcome screen <strong>Install App</strong> button there.</div><div><strong>3.</strong> Confirm the browser install prompt.</div>';
     return;
   }
   if(android()){
