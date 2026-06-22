@@ -107,28 +107,29 @@ async function create(){
   // Handle file upload - wait for completion
   const imgFile=document.querySelector('#broadcastImageFile')?.files?.[0];
   const vidFile=document.querySelector('#broadcastVideoFile')?.files?.[0];
-  const file=imgFile||vidFile;
   const imgStatus=document.querySelector('#broadcastImageStatus');
   const vidStatus=document.querySelector('#broadcastVideoStatus');
-  if(file){
-    if(file.size>52428800){toast('File too large (max 50 MB)');return}
+  const uploads=[{file:imgFile,status:imgStatus,label:'image'},{file:vidFile,status:vidStatus,label:'video'}].filter(x=>x.file);
+  if(uploads.length){
+    if(uploads.some(x=>x.file.size>52428800)){toast('File too large (max 50 MB)');return}
     const btn=document.querySelector('#broadcastForm button[type="submit"]');
-    const orig=btn.textContent;
     btn.textContent='Uploading...';btn.disabled=true;
-    if(imgFile&&imgStatus)imgStatus.textContent='Uploading...';
-    if(vidFile&&vidStatus)vidStatus.textContent='Uploading...';
+    uploads.forEach(x=>{if(x.status)x.status.textContent='Uploading...'});
     try{
       const{data:{session}}=await sb.auth.getSession();
       const tok=session?.access_token||sessionStorage.getItem('pfm_tok')||'';
-      const r1=await fetch('/api/upload',{method:'POST',body:JSON.stringify({fileName:file.name}),headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok}});
-      const j1=await r1.json();
-      if(!r1.ok||!j1.uploadUrl)throw new Error(j1.error||'Failed to get upload URL');
-      const r2=await fetch(j1.uploadUrl,{method:'PUT',body:file,headers:{'Content-Type':file.type||'application/octet-stream'}});
-      if(!r2.ok)throw new Error('File upload failed');
-      msg+='\n'+j1.publicUrl;
-      if(imgStatus)imgStatus.textContent='Uploaded';
-      if(vidStatus)vidStatus.textContent='Uploaded';
-      toast(file.name+' attached');
+      const urls=[];
+      for(const upload of uploads){
+        const r1=await fetch('/api/upload',{method:'POST',body:JSON.stringify({fileName:upload.file.name}),headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok}});
+        const j1=await r1.json();
+        if(!r1.ok||!j1.uploadUrl)throw new Error(j1.error||`Failed to get ${upload.label} upload URL`);
+        const r2=await fetch(j1.uploadUrl,{method:'PUT',body:upload.file,headers:{'Content-Type':upload.file.type||'application/octet-stream'}});
+        if(!r2.ok)throw new Error(`${upload.label[0].toUpperCase()+upload.label.slice(1)} upload failed`);
+        urls.push(j1.publicUrl);
+        if(upload.status)upload.status.textContent='Uploaded';
+      }
+      msg+='\n'+urls.join('\n');
+      toast(uploads.length===1?uploads[0].file.name+' attached':'Image and video attached');
     }catch(e){
       const em=e.message||'Upload failed';
       sessionStorage.setItem('pfm_err',em);
