@@ -81,7 +81,9 @@ async function create(){
   if(!title||!msg){toast('Title and message are required');return}
 
   // Handle file upload - wait for completion
-  const file=document.querySelector('#broadcastImageFile')?.files?.[0];
+  const imgFile=document.querySelector('#broadcastImageFile')?.files?.[0];
+  const vidFile=document.querySelector('#broadcastVideoFile')?.files?.[0];
+  const file=imgFile||vidFile;
   if(file){
     const btn=document.querySelector('#broadcastForm button[type="submit"]');
     const orig=btn.textContent;
