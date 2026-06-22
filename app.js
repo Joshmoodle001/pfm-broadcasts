@@ -87,16 +87,15 @@ async function create(){
     const orig=btn.textContent;
     btn.textContent='Uploading...';btn.disabled=true;
     try{
-      const ext=file.name.split('.').pop();
-      const path=`broadcasts/${Date.now()}.${ext}`;
-      const{error:upErr}=await sb.storage.from('media').upload(path,file,{upsert:true});
-      if(upErr)throw upErr;
-      const{data}=sb.storage.from('media').getPublicUrl(path);
-      if(!data?.publicUrl)throw new Error('Could not get public URL');
-      msg+='\n'+data.publicUrl;
+      const fd=new FormData();fd.append('file',file);
+      const{data:{session}}=await sb.auth.getSession();
+      const tok=session?.access_token||'';
+      const up=await fetch('/api/upload',{method:'POST',body:fd,headers:{Authorization:'Bearer '+tok}});
+      const j=await up.json();
+      if(!up.ok||!j.publicUrl)throw new Error(j.error||'Upload failed');
+      msg+='\n'+j.publicUrl;
       toast(file.name+' attached');
     }catch(e){
-      btn.textContent=orig;btn.disabled=false;
       toast('Upload failed: '+(e.message||''));
       return;
     }finally{btn.textContent='Send Broadcast';btn.disabled=false}
