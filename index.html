@@ -1080,7 +1080,7 @@
           <div class="page-title">
             <div>
               <h1 id="postsTitle">Posts</h1>
-              <p>Read the latest broadcasts from PFM.</p>
+              <p>Read the latest PFM broadcast updates, notices, images, and videos.</p>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
               <span class="pill" id="postCount">0 posts</span>
@@ -1097,7 +1097,7 @@
 
           <aside class="install-card desktop-panel">
             <h2>About PFM Broadcasts</h2>
-            <p>Simple company communication. Admin posts once, and every app instance receives the broadcast when the backend is connected.</p>
+            <p>Operational communication for the full team. Posts are published once and delivered across connected app sessions.</p>
             <button class="btn-secondary install-only" type="button" data-screen="install">Install on phone</button>
           </aside>
         </div>
@@ -1116,7 +1116,7 @@
             <img class="admin-logo" src="assets/pfm-logo-lockup.png" alt="PFM logo" />
             <div>
               <h2>Admin Access</h2>
-              <p>Only authorised admins can create and send broadcasts.</p>
+              <p>Secure sign-in for approved PFM broadcast administrators.</p>
             </div>
 
             <form class="form-grid" id="adminLoginForm">
@@ -1126,28 +1126,10 @@
               </label>
               <label>
                 Password
-                <input id="adminPassword" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required />
+                <input id="adminPassword" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required />
               </label>
-              <button type="submit">Unlock Admin</button>
+              <button type="submit">Sign In</button>
               <button class="btn-link" type="button" id="showResetBtn">Forgot password?</button>
-              <button class="btn-link" type="button" id="showSignupBtn">Create account</button>
-            </form>
-
-            <form class="form-grid hidden" id="signupForm">
-              <div>
-                <h2>Create Admin Account</h2>
-                <p>First account is auto-approved as admin.</p>
-              </div>
-              <label>
-                Email address
-                <input id="signupEmail" name="signupEmail" type="email" autocomplete="email" placeholder="admin@pfm.co.za" required />
-              </label>
-              <label>
-                Password
-                <input id="signupPassword" name="signupPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Minimum 8 characters" required />
-              </label>
-              <button type="submit">Create Account</button>
-              <button class="btn-link" type="button" id="backToLoginFromSignup">Back to login</button>
             </form>
 
             <form class="form-grid hidden" id="resetPasswordForm">
@@ -1172,21 +1154,21 @@
             <article class="admin-card">
               <div>
                 <h2>Broadcast Center</h2>
-                <p>Create a post and send it to the whole app.</p>
+                <p>Publish operational updates to every connected app session.</p>
               </div>
 
               <form class="form-grid" id="broadcastForm">
                 <label>
                   Broadcast title
-                  <input id="title" name="title" maxlength="80" placeholder="Example: Price Update Effective Today" required />
+                  <input id="title" name="title" maxlength="80" placeholder="Price update effective today" required />
                 </label>
                 <label>
                   Message
-                  <textarea id="body" name="body" maxlength="700" placeholder="Type the broadcast message here..." required></textarea>
+                  <textarea id="body" name="body" maxlength="700" placeholder="Write the broadcast message for the field team..." required></textarea>
                 </label>
                 <label>
                   Media link (optional)
-                  <input id="broadcastMediaUrl" name="mediaUrl" type="url" inputmode="url" placeholder="https://... image, video, YouTube, Vimeo or document link" />
+                  <input id="broadcastMediaUrl" name="mediaUrl" type="url" inputmode="url" placeholder="Paste an approved image, video, YouTube, Vimeo, or document link" />
                 </label>
                 <div class="upload-card">
                   <label>
@@ -1230,12 +1212,10 @@
               <h2>Admin Tools</h2>
               <div class="status-banner" id="backendStatus"></div>
               <div class="status-banner">
-                <strong>Admin account setup</strong>
-                <span>New admin users still need to be created in Supabase Auth and approved in <code>admin_profiles</code>. This static build does not expose the service role in-browser.</span>
+                <strong>Admin access control</strong>
+                <span>Administrator access is managed through Supabase Auth and approved admin profiles for this live environment.</span>
               </div>
               <div class="form-actions">
-                <button class="btn-secondary" type="button" id="seedBtn" data-demo-only>Add demo posts</button>
-                <button class="btn-secondary" type="button" id="clearBtn" data-demo-only>Clear demo posts</button>
                 <button class="btn-secondary" type="button" id="lockAdminBtn">Lock admin</button>
               </div>
               <div>

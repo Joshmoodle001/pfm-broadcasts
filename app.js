@@ -23,7 +23,7 @@ const E={
   nf:$('#newPasswordForm'),np:$('#newPassword'),
   sr:$('#showResetBtn'),bl:$('#backToLoginBtn'),
   bf:$('#broadcastForm'),t:$('#title'),b:$('#body'),
-  sbSeed:$('#seedBtn'),sbClear:$('#clearBtn'),lk:$('#lockAdminBtn'),
+  lk:$('#lockAdminBtn'),
   ib:$('#installBtn'),iw:$('#installFromWelcomeBtn'),is:$('#installSteps'),
   bs:$('#backendStatus'),toast:$('#toast'),dot:$('#statusDot'),lbl:$('#statusLabel')
 };
@@ -396,7 +396,7 @@ function renderPast(){
 function renderAdmin(){
   if(E.loginCard)E.loginCard.classList.toggle('hidden',admin());
   if(E.center)E.center.classList.toggle('hidden',!admin());
-  if(E.bs)E.bs.innerHTML=live?'<strong>Supabase connected</strong>':'<strong>Not connected</strong>';
+  if(E.bs)E.bs.innerHTML=live?'<strong>Supabase connected</strong><span>Live broadcasts, uploads, and admin actions are available.</span>':'<strong>Connection unavailable</strong><span>The app cannot reach Supabase right now, so admin publishing is unavailable.</span>';
 }
 
 function render(){renderPosts();renderRecent();renderPast();renderAdmin();}
@@ -443,13 +443,13 @@ document.addEventListener('click',async e=>{
 document.addEventListener('contextmenu',e=>{if(e.target.closest('img,video'))e.preventDefault()});
 document.addEventListener('dragstart',e=>{if(e.target.closest('img,video'))e.preventDefault()});
 
-E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();toast('Unlocked');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
+E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();toast('Admin signed in');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
 E.rf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.resetPasswordForEmail(E.re.value.trim());toast('Email sent');show('login')});
 E.nf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.updateUser({password:E.np.value});toast('Updated');show('login')});
 E.bf?.addEventListener('submit',async e=>{e.preventDefault();try{await create();E.bf.reset()}catch(err){toast(err.message)}});
 E.sr?.addEventListener('click',()=>show('reset'));
 E.bl?.addEventListener('click',()=>show('login'));
-E.lk?.addEventListener('click',()=>{sb.auth.signOut();sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');renderAdmin();toast('Locked')});
+E.lk?.addEventListener('click',()=>{sb.auth.signOut();sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');renderAdmin();toast('Admin locked')});
 E.tabA?.addEventListener('click',()=>{showRead=false;E.tabA.classList.add('active');E.tabR.classList.remove('active');renderPosts()});
 E.tabR?.addEventListener('click',()=>{showRead=true;E.tabR.classList.add('active');E.tabA.classList.remove('active');renderPosts()});
 $('#clearSavedMediaBtn')?.addEventListener('click',async()=>{
