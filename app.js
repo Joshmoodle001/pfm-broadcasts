@@ -87,13 +87,14 @@ async function create(){
     const orig=btn.textContent;
     btn.textContent='Uploading...';btn.disabled=true;
     try{
-      const fd=new FormData();fd.append('file',file);
       const{data:{session}}=await sb.auth.getSession();
       const tok=session?.access_token||'';
-      const up=await fetch('/api/upload',{method:'POST',body:fd,headers:{Authorization:'Bearer '+tok}});
-      const j=await up.json();
-      if(!up.ok||!j.publicUrl)throw new Error(j.error||'Upload failed');
-      msg+='\n'+j.publicUrl;
+      const r1=await fetch('/api/upload',{method:'POST',body:JSON.stringify({fileName:file.name}),headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok}});
+      const j1=await r1.json();
+      if(!r1.ok||!j1.uploadUrl)throw new Error(j1.error||'Failed to get upload URL');
+      const r2=await fetch(j1.uploadUrl,{method:'PUT',body:file});
+      if(!r2.ok)throw new Error('File upload failed');
+      msg+='\n'+j1.publicUrl;
       toast(file.name+' attached');
     }catch(e){
       toast('Upload failed: '+(e.message||''));
