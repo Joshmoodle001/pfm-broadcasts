@@ -9,6 +9,9 @@ if(!devId){devId=crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.rando
 
 let sb, live, channel, posts=[], reads=new Set(), defInstall, showRead=false, imgCache=null;
 const MEDIA_CACHE='pfm-media-v1';
+const MEDIA_META='pfm_media_meta_v1';
+let mediaMetaCache=null;
+const mediaMetaPending=new Set();
 
 const $=s=>document.querySelector(s);
 const E={
@@ -40,8 +43,43 @@ function on(v){if(E.dot)E.dot.style.background=v?'#15803d':'#d71920';if(E.lbl)E.
 
 function getImgCache(){if(!imgCache)imgCache=JSON.parse(localStorage.getItem('pfm_imgs')||'{}');return imgCache;}
 function saveImgCache(url){const c=getImgCache();c[url]=1;localStorage.setItem('pfm_imgs',JSON.stringify(c));imgCache=c;}
+function getMediaMeta(){if(!mediaMetaCache)mediaMetaCache=JSON.parse(localStorage.getItem(MEDIA_META)||'{}');return mediaMetaCache;}
+function saveMediaMeta(url,meta){const all=getMediaMeta();all[url]={...(all[url]||{}),...meta};localStorage.setItem(MEDIA_META,JSON.stringify(all));mediaMetaCache=all;}
 function mediaSaved(url){return !!getImgCache()[url];}
 function mediaCopy(type,saved){return saved?`Tap to open saved ${type}`:`Tap to view ${type}`;}
+function formatBytes(bytes){
+  const num=Number(bytes);
+  if(!Number.isFinite(num)||num<=0)return '';
+  const units=['B','KB','MB','GB'];
+  let value=num,unit=0;
+  while(value>=1024&&unit<units.length-1){value/=1024;unit++;}
+  return `${value>=10||unit===0?value.toFixed(0):value.toFixed(1)} ${units[unit]}`;
+}
+function mediaDetail(url,fallback){
+  const size=getMediaMeta()[url]?.size;
+  const sizeText=formatBytes(size);
+  return sizeText?`${fallback} • Uses about ${sizeText}`:fallback;
+}
+async function ensureMediaMeta(url){
+  if(getMediaMeta()[url]?.size||mediaMetaPending.has(url))return;
+  mediaMetaPending.add(url);
+  try{
+    const response=await fetch(url,{method:'HEAD',mode:'cors',credentials:'omit'});
+    const length=response.headers.get('content-length');
+    const size=length?parseInt(length,10):0;
+    if(size>0){
+      saveMediaMeta(url,{size});
+      renderPosts();
+    }
+  }catch{}
+  mediaMetaPending.delete(url);
+}
+async function clearSavedMedia(){
+  if('caches' in window)await caches.delete(MEDIA_CACHE);
+  localStorage.removeItem('pfm_imgs');
+  imgCache=null;
+  renderPosts();
+}
 async function mediaSrc(url){
   if(!('caches' in window))return url;
   const cache=await caches.open(MEDIA_CACHE);
@@ -202,7 +240,8 @@ function renderBody(txt){
     const isMP4=/\.(mp4|webm|mov|3gp|avi|mkv)(\?\S*)?$/i.test(url)||/storage\/v1\/object\/public/.test(url);
     if(isImg){
       const saved=mediaSaved(url);
-      btns+='<div class="media-block"><button class="media-launch img-load" type="button" data-img="'+url+'"><span class="media-chip">'+(saved?'Saved image':'Image')+'</span><strong>'+mediaCopy('image',saved)+'</strong><span>'+(saved?'Stored in app data for repeat viewing.':'Loads only when you choose to open it.')+'</span></button></div>';
+      ensureMediaMeta(url);
+      btns+='<div class="media-block"><button class="media-launch img-load" type="button" data-img="'+url+'"><span class="media-chip">'+(saved?'Saved image':'Image')+'</span><strong>'+mediaCopy('image',saved)+'</strong><span>'+mediaDetail(url,saved?'Stored in app data for repeat viewing.':'Loads only when you choose to open it.')+'</span></button></div>';
       return'';
     }
     if(yt){
@@ -211,7 +250,8 @@ function renderBody(txt){
     }
     if(isMP4){
       const saved=mediaSaved(url);
-      btns+='<div class="media-block"><button class="media-launch vid-card" type="button" data-vid="'+url+'"><span class="media-chip">'+(saved?'Saved video':'Video')+'</span><strong>'+mediaCopy('video',saved)+'</strong><span>'+(saved?'Stored in app data for repeat playback.':'Loads only when you choose to play it.')+'</span></button></div>';
+      ensureMediaMeta(url);
+      btns+='<div class="media-block"><button class="media-launch vid-card" type="button" data-vid="'+url+'"><span class="media-chip">'+(saved?'Saved video':'Video')+'</span><strong>'+mediaCopy('video',saved)+'</strong><span>'+mediaDetail(url,saved?'Stored in app data for repeat playback.':'Loads only when you choose to play it.')+'</span></button></div>';
       return'';
     }
     return '<a href="'+url+'" target="_blank" rel="noopener" style="color:var(--pfm-blue-2);text-decoration:underline;word-break:break-all">'+url+'</a>';
@@ -300,6 +340,11 @@ E.bl?.addEventListener('click',()=>show('login'));
 E.lk?.addEventListener('click',()=>{sb.auth.signOut();sessionStorage.removeItem('pfm_ad');sessionStorage.removeItem('pfm_ad_ts');renderAdmin();toast('Locked')});
 E.tabA?.addEventListener('click',()=>{showRead=false;E.tabA.classList.add('active');E.tabR.classList.remove('active');renderPosts()});
 E.tabR?.addEventListener('click',()=>{showRead=true;E.tabR.classList.add('active');E.tabA.classList.remove('active');renderPosts()});
+$('#clearSavedMediaBtn')?.addEventListener('click',async()=>{
+  if(!confirm('Clear all saved image and video copies from this device? You will need to tap to load them again.'))return;
+  await clearSavedMedia();
+  toast('Saved media cleared from this device');
+});
 
 window.addEventListener('online',async()=>{
   const q=JSON.parse(localStorage.getItem('pfm_readq')||'[]');
