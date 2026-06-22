@@ -71,6 +71,7 @@ async function login(){
   if(!prof)throw new Error('Not an approved admin');
   sessionStorage.setItem('pfm_ad','1');
   sessionStorage.setItem('pfm_ad_ts',Date.now());
+  if(data.session?.access_token)sessionStorage.setItem('pfm_tok',data.session.access_token);
 }
 
 async function create(){
@@ -90,16 +91,18 @@ async function create(){
     btn.textContent='Uploading...';btn.disabled=true;
     try{
       const{data:{session}}=await sb.auth.getSession();
-      const tok=session?.access_token||'';
+      const tok=session?.access_token||sessionStorage.getItem('pfm_tok')||'';
       const r1=await fetch('/api/upload',{method:'POST',body:JSON.stringify({fileName:file.name}),headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok}});
       const j1=await r1.json();
       if(!r1.ok||!j1.uploadUrl)throw new Error(j1.error||'Failed to get upload URL');
-      const r2=await fetch(j1.uploadUrl,{method:'PUT',body:file});
+      const r2=await fetch(j1.uploadUrl,{method:'PUT',body:file,headers:{'Content-Type':file.type||'application/octet-stream'}});
       if(!r2.ok)throw new Error('File upload failed');
       msg+='\n'+j1.publicUrl;
       toast(file.name+' attached');
     }catch(e){
-      toast('Upload failed: '+(e.message||''));
+      const em=e.message||'Upload failed';
+      sessionStorage.setItem('pfm_err',em);
+      toast('Upload failed: '+em);
       return;
     }finally{btn.textContent='Send Broadcast';btn.disabled=false}
   }
@@ -134,7 +137,7 @@ function renderBody(txt){
   safe=safe.replace(/(https?:\/\/\S+)/gi,(url)=>{
     const isImg=/\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(url)||/images\.unsplash\.com\/photo-/.test(url);
     const yt=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-    const isMP4=/\.(mp4|webm|mov)(\?\S*)?$/i.test(url)||/storage\/v1\/object\/public/.test(url);
+    const isMP4=/\.(mp4|webm|mov|3gp|avi|mkv)(\?\S*)?$/i.test(url)||/storage\/v1\/object\/public/.test(url);
     if(isImg){
       if(loaded[url]){btns+='<img src="'+url+'" loading="lazy" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;display:block;margin:8px 0" onerror="this.remove()" />';}
       else{btns+='<button class="img-load" data-img="'+url+'" style="width:100%;min-height:48px;border:1px dashed var(--line);border-radius:12px;background:var(--soft);color:var(--pfm-blue-2);font-size:13px;font-weight:700;cursor:pointer;margin:8px 0;display:flex;align-items:center;justify-content:center">Tap to view image</button>';}
