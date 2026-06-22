@@ -12,15 +12,10 @@ const MEDIA_CACHE='pfm-media-v1';
 const MEDIA_META='pfm_media_meta_v1';
 let mediaMetaCache=null;
 const mediaMetaPending=new Set();
-const VIEW_THRESHOLD=.65;
-const VIEW_DELAY_MS=1200;
-let viewedNow=new Set(), viewObserver=null, readStats=new Map();
-const viewTimers=new Map();
 
 const $=s=>document.querySelector(s);
 const E={
   list:$('#postsList'),cnt:$('#postCount'),rec:$('#recentList'),past:$('#pastList'),
-  stats:$('#statsList'),
   tabA:$('#tabActive'),tabR:$('#tabRead'),
   loginCard:$('#adminLoginCard'),center:$('#adminCenter'),
   lf:$('#adminLoginForm'),le:$('#adminEmail'),lp:$('#adminPassword'),
@@ -39,7 +34,6 @@ function dt(d){return new Intl.DateTimeFormat('en-ZA',{day:'2-digit',month:'shor
 function prio(p){return{urgent:'Urgent',important:'Important',general:'General'}[p]||'General';}
 function norm(r){return{id:r.id,title:r.title,body:r.body||r.message,priority:r.priority||'general',created:r.created_at||r.created||new Date().toISOString(),expires:r.expires_at||null,is_active:r.isActive??r.is_active??true};}
 function isRead(i){return reads.has(i.id);}
-function isSeen(i){return reads.has(i.id)||viewedNow.has(i.id);}
 function sorted(a,expired){
   let arr=[...a].filter(i=>i.is_active!==false);
   if(!expired)arr=arr.filter(i=>!i.expires||new Date(i.expires)>new Date());
@@ -226,82 +220,6 @@ function enableImageZoom(wrap,img){
 function standalone(){return window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;}
 function ios(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function android(){return /android/i.test(navigator.userAgent);}
-function onPostsScreen(){return document.querySelector('#screen-posts')?.classList.contains('active');}
-function clearViewTimers(id){
-  if(id){
-    const timer=viewTimers.get(id);
-    if(timer)clearTimeout(timer);
-    viewTimers.delete(id);
-    return;
-  }
-  [...viewTimers.keys()].forEach(key=>clearViewTimers(key));
-}
-function disconnectViewObserver(){
-  clearViewTimers();
-  if(viewObserver){viewObserver.disconnect();viewObserver=null;}
-}
-function updateReadQueue(id){
-  const q=JSON.parse(localStorage.getItem('pfm_readq')||'[]');
-  if(!q.includes(id)){q.push(id);localStorage.setItem('pfm_readq',JSON.stringify(q))}
-}
-function bumpReadStat(id){
-  const stat=readStats.get(id)||{count:0,lastSeen:null};
-  stat.count+=1;
-  stat.lastSeen=new Date().toISOString();
-  readStats.set(id,stat);
-}
-async function syncRead(id){
-  if(!live){return}
-  try{await sb.from('broadcast_reads').upsert({broadcast_id:id,device_id:devId},{onConflict:'broadcast_id,device_id'})}
-  catch{updateReadQueue(id)}
-}
-async function registerView(id,{acknowledged=false}={}){
-  id=String(id||'').trim();
-  if(!id)return false;
-  const firstView=!reads.has(id)&&!viewedNow.has(id);
-  viewedNow.add(id);
-  if(firstView&&admin()){bumpReadStat(id);renderStats()}
-  await syncRead(id);
-  if(acknowledged)reads.add(id);
-  return firstView;
-}
-function aggregateReadStats(rows){
-  const map=new Map();
-  (rows||[]).forEach(row=>{
-    const current=map.get(row.broadcast_id)||{count:0,lastSeen:null};
-    current.count+=1;
-    if(row.read_at&&(!current.lastSeen||new Date(row.read_at)>new Date(current.lastSeen)))current.lastSeen=row.read_at;
-    map.set(row.broadcast_id,current);
-  });
-  return map;
-}
-function observePostViews(){
-  disconnectViewObserver();
-  if(!live||!onPostsScreen()||!E.list?.children?.length)return;
-  viewObserver=new IntersectionObserver(entries=>{
-    entries.forEach(entry=>{
-      const id=entry.target.dataset.postId;
-      if(!id)return;
-      if(entry.isIntersecting&&entry.intersectionRatio>=VIEW_THRESHOLD&&!reads.has(id)&&!viewedNow.has(id)&&!viewTimers.has(id)){
-        const timer=setTimeout(async()=>{
-          viewTimers.delete(id);
-          if(!onPostsScreen())return;
-          const rect=entry.target.getBoundingClientRect();
-          const vh=window.innerHeight||document.documentElement.clientHeight||0;
-          const visible=Math.max(0,Math.min(vh,rect.bottom)-Math.max(0,rect.top));
-          const ratio=visible/Math.max(1,rect.height);
-          if(ratio<VIEW_THRESHOLD)return;
-          await registerView(id);
-          renderPosts();
-        },VIEW_DELAY_MS);
-        viewTimers.set(id,timer);
-      }else if((!entry.isIntersecting||entry.intersectionRatio<VIEW_THRESHOLD)&&viewTimers.has(id)){
-        clearViewTimers(id);
-      }
-    });
-  },{threshold:[0,VIEW_THRESHOLD,1]});
-  document.querySelectorAll('#postsList .post-card[data-post-id]').forEach(card=>viewObserver.observe(card));
-}
 function renderInstallSteps(){
   if(!E.is)return;
   if(standalone()){
@@ -325,15 +243,12 @@ function renderInstallSteps(){
 
 async function refresh(){
   try{
-    const statsReq=admin()?sb.from('broadcast_reads').select('broadcast_id,read_at').order('read_at',{ascending:false}).limit(5000):Promise.resolve({data:null,error:null});
-    const[a,b,c]=await Promise.all([
+    const[a,b]=await Promise.all([
       sb.from('broadcasts').select('id,title,message,priority,created_at,expires_at,is_active').eq('is_active',true).order('created_at',{ascending:false}).limit(200),
-      sb.from('broadcast_reads').select('broadcast_id').eq('device_id',devId),
-      statsReq
+      sb.from('broadcast_reads').select('broadcast_id').eq('device_id',devId)
     ]);
     if(!a.error)posts=(a.data||[]).map(norm);
     if(!b.error)reads=new Set((b.data||[]).map(r=>r.broadcast_id));
-    readStats=admin()&&!c?.error?aggregateReadStats(c.data):new Map();
     render();
   }catch(e){console.error(e)}
 }
@@ -341,7 +256,7 @@ async function refresh(){
 function sub(){if(!sb||channel)return;channel=sb.channel('p').on('postgres_changes',{event:'INSERT',schema:'public',table:'broadcasts'},p=>{
   const n=p.new;if(n&&n.priority==='urgent'&&Notification.permission==='granted'){new Notification(n.title,{body:n.message,icon:'/icons/icon-192.png',tag:n.id})}
   refresh();
-}).on('postgres_changes',{event:'*',schema:'public',table:'broadcast_reads'},()=>{if(admin())refresh()}).subscribe();}
+}).on('postgres_changes',{event:'*',schema:'public',table:'broadcast_reads'},refresh).subscribe();}
 
 function admin(){
   if(!live||sessionStorage.getItem('pfm_ad')!=='1')return false;
@@ -420,7 +335,7 @@ async function del(id){
     sessionStorage.removeItem('pfm_ad');
     sessionStorage.removeItem('pfm_ad_ts');
     renderAdmin();
-    show('login');
+    showLogin();
     switchScreen('admin');
     toast('Session expired. Please log in again.');
     return;
@@ -457,14 +372,13 @@ function renderBody(txt){
 }
 
 function renderPosts(){
-  const active=sorted(posts).filter(i=>!reads.has(i.id)||viewedNow.has(i.id));
-  const readItems=sorted(posts).filter(i=>isSeen(i));
+  const active=sorted(posts).filter(i=>!isRead(i));
+  const readItems=sorted(posts).filter(i=>isRead(i));
   const items=showRead?readItems:active;
   E.cnt.textContent=items.length+' post'+(items.length!==1?'s':'');
-  if(!showRead){const unseen=sorted(posts).filter(i=>!isSeen(i)).length;if(unseen)E.cnt.textContent+=' - '+unseen+' not yet viewed';}
+  if(!showRead){const u=active.length;if(u)E.cnt.textContent+=' - '+u+' unread';}
   E.list.innerHTML=items.length?'':'<div class="empty">'+(showRead?'No read posts yet.':'No posts yet.')+'</div>';
-  items.forEach(i=>{try{const c=document.createElement('article');const rd=isRead(i),seen=viewedNow.has(i.id);c.dataset.postId=i.id;c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><div class="post-heading"><h3>'+esc(i.title)+'</h3><span class="post-date">'+dt(i.created)+'</span></div><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><div class="post-body">'+renderBody(i.body)+'</div><div class="post-meta"><button class="'+((rd||seen)?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':seen?'Viewed on this device':'I have read this')+'</button></div>';E.list.appendChild(c);}catch{}});
-  observePostViews();
+  items.forEach(i=>{try{const c=document.createElement('article');const rd=isRead(i);c.className='post-card '+(rd?'read ':'unread ')+esc(i.priority);c.innerHTML='<div class="post-top"><div class="post-heading"><h3>'+esc(i.title)+'</h3><span class="post-date">'+dt(i.created)+'</span></div><span class="tag '+(rd?'read':esc(i.priority))+'">'+(rd?'Read':prio(i.priority))+'</span></div><div class="post-body">'+renderBody(i.body)+'</div><div class="post-meta"><button class="'+(rd?'btn-secondary':'')+'" type="button" data-read="'+esc(i.id)+'">'+(rd?'Read again':'I have read this')+'</button></div>';E.list.appendChild(c);}catch{}});
 }
 
 function renderRecent(){
@@ -478,22 +392,6 @@ function renderPast(){
   E.past.innerHTML=past.length?'':'<div class="empty">No expired posts.</div>';
   past.forEach(i=>{const d=document.createElement('div');d.className='recent-item';d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>'+esc(i.title)+'</strong><br><span>Expired: '+dt(i.expires)+'</span></div><button class="btn-link" data-delete="'+esc(i.id)+'" style="color:#d71920;font-size:12px">Delete</button></div>';E.past.appendChild(d);});
 }
-function renderStats(){
-  if(!E.stats)return;
-  if(!admin()){E.stats.innerHTML='<div class="empty">Sign in to view broadcast stats.</div>';return}
-  if(!live){E.stats.innerHTML='<div class="empty">Stats are unavailable while the backend is offline.</div>';return}
-  const items=[...posts].sort((a,b)=>new Date(b.created)-new Date(a.created));
-  E.stats.innerHTML=items.length?'':'<div class="empty">No broadcasts available.</div>';
-  items.forEach(item=>{
-    const stat=readStats.get(item.id)||{count:0,lastSeen:null};
-    const countLabel=stat.count===1?'1 device view':`${stat.count} device views`;
-    const lastSeen=stat.lastSeen?`Last view: ${dt(stat.lastSeen)}`:'No recorded views yet';
-    const row=document.createElement('div');
-    row.className='recent-item';
-    row.innerHTML='<strong>'+esc(item.title)+'</strong><br><span>'+countLabel+' - '+lastSeen+'</span>';
-    E.stats.appendChild(row);
-  });
-}
 
 function renderAdmin(){
   if(E.loginCard)E.loginCard.classList.toggle('hidden',admin());
@@ -501,7 +399,7 @@ function renderAdmin(){
   if(E.bs)E.bs.innerHTML=live?'<strong>Supabase connected</strong><span>Live broadcasts, uploads, and admin actions are available.</span>':'<strong>Connection unavailable</strong><span>The app cannot reach Supabase right now, so admin publishing is unavailable.</span>';
 }
 
-function render(){renderPosts();renderRecent();renderPast();renderStats();renderAdmin();}
+function render(){renderPosts();renderRecent();renderPast();renderAdmin();}
 
 function show(s){E.lf.classList.add('hidden');E.rf.classList.add('hidden');E.nf.classList.add('hidden');if(s)(s==='login'?E.lf:s==='reset'?E.rf:E.nf).classList.remove('hidden');}
 
@@ -510,7 +408,6 @@ function switchScreen(s){
   document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id==='screen-'+s));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.screen===s));
   if(s==='admin')renderAdmin();
-  if(s==='posts')observePostViews();else disconnectViewObserver();
   history.replaceState(null,'','#'+s);scrollTo(0,0);
 }
 
@@ -538,7 +435,7 @@ init();
 
 document.addEventListener('click',async e=>{
   const s=e.target.closest('[data-screen]');if(s){switchScreen(s.dataset.screen);return}
-  const r=e.target.closest('[data-read]');if(r){await registerView(r.dataset.read,{acknowledged:true});render();toast('Marked as read');return}
+  const r=e.target.closest('[data-read]');if(r){if(!live){reads.add(r.dataset.read);render();toast('Marked as read');return}try{await sb.from('broadcast_reads').upsert({broadcast_id:r.dataset.read,device_id:devId},{onConflict:'broadcast_id,device_id'})}catch{const q=JSON.parse(localStorage.getItem('pfm_readq')||'[]');if(!q.includes(r.dataset.read)){q.push(r.dataset.read);localStorage.setItem('pfm_readq',JSON.stringify(q))}}reads.add(r.dataset.read);render();toast('Marked as read');return}
   const d=e.target.closest('[data-delete]');if(d){if(confirm('Delete this broadcast?'))await del(d.dataset.delete);return}
     const img=e.target.closest('.img-load');if(img){const wrap=document.createElement('div');wrap.className='media-preview';const el=hardenMedia(document.createElement('img'));try{el.src=await mediaSrc(img.dataset.img)}catch{el.src=img.dataset.img}el.loading='lazy';el.referrerPolicy='no-referrer';el.alt='Broadcast image preview';el.onerror=()=>wrap.remove();wrap.appendChild(el);enableImageZoom(wrap,el);try{img.closest('.media-block')?.replaceWith(wrap)}catch{render()};return}
     const vc=e.target.closest('.vid-card');if(vc){const id=vc.dataset.vid;let el;if(id.includes('.')){el=hardenMedia(document.createElement('video'));try{el.src=await mediaSrc(id)}catch{el.src=id}el.style.cssText='width:100%;max-height:360px;border-radius:12px;display:block;background:#000'}else{el=document.createElement('iframe');el.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0';el.allow='autoplay;fullscreen';el.style.cssText='width:100%;aspect-ratio:16/9;border:0;border-radius:12px'}const wrap=document.createElement('div');wrap.className='media-preview';wrap.appendChild(el);try{vc.closest('.media-block')?.replaceWith(wrap)}catch{render()};return}
@@ -546,7 +443,7 @@ document.addEventListener('click',async e=>{
 document.addEventListener('contextmenu',e=>{if(e.target.closest('img,video'))e.preventDefault()});
 document.addEventListener('dragstart',e=>{if(e.target.closest('img,video'))e.preventDefault()});
 
-E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();await refresh();toast('Admin signed in');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
+E.lf?.addEventListener('submit',async e=>{e.preventDefault();try{await login();toast('Admin signed in');renderAdmin()}catch(err){toast(err.message||'Login failed')}});
 E.rf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.resetPasswordForEmail(E.re.value.trim());toast('Email sent');show('login')});
 E.nf?.addEventListener('submit',async e=>{e.preventDefault();await sb.auth.updateUser({password:E.np.value});toast('Updated');show('login')});
 E.bf?.addEventListener('submit',async e=>{e.preventDefault();try{await create();E.bf.reset()}catch(err){toast(err.message)}});
@@ -571,7 +468,6 @@ window.addEventListener('hashchange',()=>{const s=location.hash.replace('#','');
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();defInstall=e;renderInstallSteps()});
 window.addEventListener('appinstalled',()=>{defInstall=null;document.body.classList.add('standalone');renderInstallSteps();switchScreen('posts')});
 window.addEventListener('beforeunload',()=>{if(channel){sb.removeChannel(channel);channel=null}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)clearViewTimers()});
 E.ib?.addEventListener('click',async()=>{
   if(standalone()){switchScreen('posts');return}
   if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null;renderInstallSteps();return}
