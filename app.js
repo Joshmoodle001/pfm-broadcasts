@@ -24,7 +24,7 @@ const E={
   sr:$('#showResetBtn'),bl:$('#backToLoginBtn'),
   bf:$('#broadcastForm'),t:$('#title'),b:$('#body'),
   lk:$('#lockAdminBtn'),
-  ib:$('#installBtn'),iw:$('#installFromWelcomeBtn'),is:$('#installSteps'),
+  is:$('#installSteps'),
   bs:$('#backendStatus'),toast:$('#toast'),dot:$('#statusDot'),lbl:$('#statusLabel')
 };
 
@@ -220,6 +220,31 @@ function enableImageZoom(wrap,img){
 function standalone(){return window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;}
 function ios(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function android(){return /android/i.test(navigator.userAgent);}
+async function openInstallFlow(){
+  if(standalone()){switchScreen('posts');return;}
+  if(defInstall){
+    defInstall.prompt();
+    await defInstall.userChoice;
+    defInstall=null;
+    renderInstallSteps();
+    return;
+  }
+  if(ios()){
+    toast('Open in Safari → tap Share → Add to Home Screen');
+    switchScreen('install');
+    renderInstallSteps();
+    return;
+  }
+  if(android()){
+    toast('Open Chrome menu → Install app or Add to Home screen');
+    switchScreen('install');
+    renderInstallSteps();
+    return;
+  }
+  toast('Use Chrome on Android or Safari on iPhone to install this app.');
+  switchScreen('install');
+  renderInstallSteps();
+}
 function renderInstallSteps(){
   if(!E.is)return;
   if(standalone()){
@@ -227,7 +252,7 @@ function renderInstallSteps(){
     return;
   }
   if(defInstall){
-    E.is.innerHTML='<div><strong>Ready to install.</strong> Tap the button above and confirm the install prompt.</div>';
+    E.is.innerHTML='<div><strong>Ready to install.</strong> Return to the Welcome screen and tap <strong>Install App</strong>, then confirm the browser prompt.</div>';
     return;
   }
   if(ios()){
@@ -238,7 +263,7 @@ function renderInstallSteps(){
     E.is.innerHTML='<div><strong>1.</strong> Open this site in Chrome.</div><div><strong>2.</strong> Tap the browser menu.</div><div><strong>3.</strong> Choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</div>';
     return;
   }
-  E.is.innerHTML='<div><strong>Install support depends on your browser.</strong> Use Chrome on Android or Safari on iPhone for the best install flow.</div>';
+  E.is.innerHTML='<div><strong>Install support depends on your browser.</strong> Use Chrome on Android or Safari on iPhone, then start from the Welcome screen <strong>Install App</strong> button.</div>';
 }
 
 async function refresh(){
@@ -468,29 +493,8 @@ window.addEventListener('hashchange',()=>{const s=location.hash.replace('#','');
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();defInstall=e;renderInstallSteps()});
 window.addEventListener('appinstalled',()=>{defInstall=null;document.body.classList.add('standalone');renderInstallSteps();switchScreen('posts')});
 window.addEventListener('beforeunload',()=>{if(channel){sb.removeChannel(channel);channel=null}});
-E.ib?.addEventListener('click',async()=>{
-  if(standalone()){switchScreen('posts');return}
-  if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null;renderInstallSteps();return}
-  if(ios()){toast('Open in Safari → tap Share → Add to Home Screen');switchScreen('install');renderInstallSteps();return}
-  if(android()){toast('Open Chrome menu → Install app or Add to Home screen');switchScreen('install');renderInstallSteps();return}
-  toast('Use Chrome on Android or Safari on iPhone to install this app.');
-  switchScreen('install');renderInstallSteps();
-});
-E.iw?.addEventListener('click',async()=>{
-  if(standalone()){switchScreen('posts');return}
-  if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null;renderInstallSteps();return}
-  switchScreen('install');renderInstallSteps();
-});
-// Smart install button - detects device
 const smartBtn=$('#smartInstallBtn');
-smartBtn?.addEventListener('click',async()=>{
-  if(standalone()){switchScreen('posts');return}
-  if(defInstall){defInstall.prompt();await defInstall.userChoice;defInstall=null;renderInstallSteps();return}
-  if(ios()){toast('Open in Safari → tap Share → Add to Home Screen');switchScreen('install');renderInstallSteps();return}
-  if(android()){toast('Open Chrome menu → Install app or Add to Home screen');switchScreen('install');renderInstallSteps();return}
-  toast('Use Chrome on Android or Safari on iPhone to install this app.');
-  switchScreen('install');renderInstallSteps();
-});
+smartBtn?.addEventListener('click',openInstallFlow);
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js');
 
